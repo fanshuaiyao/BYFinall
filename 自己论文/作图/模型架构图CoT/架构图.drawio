@@ -34,7 +34,7 @@
         <mxCell id="R99bBdNNI46LOF5ED4ai-14" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;font face=&quot;Times New Roman&quot;&gt;&lt;span style=&quot;font-size: 14px;&quot;&gt;&lt;b&gt;CoT&lt;/b&gt;&lt;/span&gt;&lt;/font&gt;" vertex="1">
           <mxGeometry height="30" width="60" x="330" y="301" as="geometry" />
         </mxCell>
-        <mxCell id="R99bBdNNI46LOF5ED4ai-15" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Times New Roman;" value="&lt;b&gt;[SMILES] + [Properties] +&lt;/b&gt;&lt;div&gt;&lt;b&gt;&quot;Let think step by step&quot;&lt;/b&gt;&lt;/div&gt;" vertex="1">
+        <mxCell id="R99bBdNNI46LOF5ED4ai-15" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Times New Roman;" value="&lt;b&gt;[SMILES] + [Properties] +&lt;/b&gt;&lt;div&gt;&lt;b&gt;&quot;Let&#39;s think step by step&quot;&lt;/b&gt;&lt;/div&gt;" vertex="1">
           <mxGeometry height="30" width="180" x="270" y="331" as="geometry" />
         </mxCell>
         <mxCell id="R99bBdNNI46LOF5ED4ai-21" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=light-dark(#9a9abb, #9ea0ce);strokeWidth=2;" value="" vertex="1">
