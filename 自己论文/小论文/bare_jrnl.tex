@@ -173,7 +173,8 @@
 
 % *** SPECIALIZED LIST PACKAGES ***
 %
-%\usepackage{algorithmic}
+\usepackage{algorithmic}
+\usepackage{algorithm}
 % algorithmic.sty was written by Peter Williams and Rogerio Brito.
 % This package provides an algorithmic environment fo describing algorithms.
 % You can use the algorithmic environment in-text or within a figure
@@ -528,6 +529,49 @@ The knowledge-rewriting process is formulated as:
 T_{enhanced} = LLM_{rewrite}(T_{raw}, \mathcal{D})
 \end{equation}
 where the LLM is instructed to (1) filter out redundant and noisy information from $T_{raw}$, and (2) explicitly integrate the physicochemical descriptors $\mathcal{D}$ into a coherent, knowledge-dense description $T_{enhanced}$. This process transforms vague textual narratives into structured descriptions anchored by objective molecular properties, providing a more robust foundation for subsequent multimodal learning.
+
+The detailed knowledge-rewriting procedure is presented in Algorithm~\ref{alg:knowledge_rewriting}.
+
+\begin{algorithm}
+\caption{Knowledge Rewriting Pipeline}
+\label{alg:knowledge_rewriting}
+\begin{algorithmic}[1]
+\REQUIRE SMILES string $S$, PubChem CID $c$
+\ENSURE Enhanced text description $T_{enhanced}$
+\STATE \textbf{Step 1: Data Acquisition}
+\STATE Query PubChem PUG View API with CID $c$
+\STATE Extract raw text fields: $T_{raw} \leftarrow$ \{Names, Identifiers, Record Description\}
+\STATE \textbf{Step 2: Physicochemical Descriptor Extraction}
+\STATE Parse molecular structure from $S$ using RDKit
+\STATE Compute descriptor set $\mathcal{D}$:
+\STATE \quad $\mathcal{D}_{LogP} \leftarrow$ CalculateMolLogP($S$)
+\STATE \quad $\mathcal{D}_{TPSA} \leftarrow$ CalculateTPSA($S$)
+\STATE \quad $\mathcal{D}_{MolWt} \leftarrow$ CalculateExactMolWt($S$)
+\STATE \quad $\mathcal{D}_{HeavyAtoms} \leftarrow$ GetNumHeavyAtoms($S$)
+\STATE \quad $\mathcal{D}_{HBD} \leftarrow$ GetNumHBD($S$)
+\STATE \quad $\mathcal{D}_{HBA} \leftarrow$ GetNumHBA($S$)
+\STATE \quad $\mathcal{D}_{RotatableBonds} \leftarrow$ GetNumRotatableBonds($S$)
+\STATE \quad $\mathcal{D}_{RingCount} \leftarrow$ GetRingCount($S$)
+\STATE \quad $\mathcal{D}_{AromaticRings} \leftarrow$ GetNumAromaticRings($S$)
+\STATE \quad $\mathcal{D}_{Stereocenters} \leftarrow$ GetNumStereocenters($S$)
+\STATE Assemble $\mathcal{D} \leftarrow [\mathcal{D}_{LogP}, \mathcal{D}_{TPSA}, ..., \mathcal{D}_{Stereocenters}]$
+\STATE \textbf{Step 3: LLM-based Knowledge Rewriting}
+\STATE Construct system prompt $\mathcal{P}_{sys}$:
+\STATE \quad ``You are a chemical informatics expert. Rewrite the following''
+\STATE \quad ``molecular description by (1) removing administrative metadata,''
+\STATE \quad ``historical anecdotes, and redundant information; (2) explicitly''
+\STATE \quad ``incorporating the provided physicochemical descriptors; (3)''
+\STATE \quad ``maintaining pharmacologically relevant semantics.''
+\STATE Construct input prompt $\mathcal{P}_{input} \leftarrow [T_{raw}, \mathcal{D}]$
+\STATE $T_{enhanced} \leftarrow LLM_{inference}(\mathcal{P}_{sys}, \mathcal{P}_{input})$
+\STATE \textbf{Step 4: Quality Validation (Optional)}
+\STATE Check descriptor consistency: $verify(T_{enhanced}, \mathcal{D})$
+\STATE \quad \textbf{if} inconsistency detected \textbf{then}
+\STATE \quad \quad Re-generate with stricter constraints
+\STATE \quad \textbf{end if}
+\RETURN $T_{enhanced}$
+\end{algorithmic}
+\end{algorithm}
 
 \subsection{Multimodal Encoders}
 KGAMA employs four specialized encoders to handle heterogeneous molecular modalities:
