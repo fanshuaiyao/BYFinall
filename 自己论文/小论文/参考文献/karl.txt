@@ -1,0 +1,482 @@
+IEEE TRANSACTIONS ON COMPUTATIONAL BIOLOGY AND BIOINFORMATICS, VOL. 22, NO. 1, JANUARY/FEBRUARY 2025                                            375
+
+Short Papers
+
+Improving Molecule Generation and Drug Discovery With a
+           Knowledge-Enhanced Generative Model
+
+            Aditya Malusare and Vaneet Aggarwal , Senior Member, IEEE
+
+   Abstract--Recent advancements in generative models have established          amount of biomedical knowledge, there is a missing link between these
+state-of-the-art benchmarks in the generation of molecules and novel drug       collective datasets and the efforts to build generative models for drug
+candidates. Despite these successes, a significant gap persists between         discovery.
+generative models and the utilization of extensive biomedical knowledge,
+often systematized within knowledge graphs, whose potential to inform              Addressing these limitations, we introduce an innovative methodol-
+and enhance generative processes has not been realized. In this paper, we       ogy for generating drugs that not only harnesses structured biological
+present a novel approach that bridges this divide by developing a framework     knowledge but ensures semantic coherence when generating new in-
+for knowledge-enhanced generative models called KARL. We develop a              sights from existing knowledge graphs. Our scalable model employs
+scalable methodology to extend the functionality of knowledge graphs while      knowledge graph embeddings to direct a diffusion-based generative
+preserving semantic integrity, and incorporate this contextual information      model, fine-tuned by an original reinforcement learning reward strategy.
+into a generative framework to guide a diffusion-based model. The inte-         This symbiosis between comprehensive bio-knowledge and generative
+gration of knowledge graph embeddings with our generative model fur-            models paves a pathway for the interpretative, scalable, and controllable
+nishes a robust mechanism for producing novel drug candidates possessing        generation of drug molecules.
+specific characteristics while ensuring validity and synthesizability. KARL
+outperforms state-of-the-art generative models on both unconditional and           In order to improve the process of computational drug discovery, we
+targeted generation tasks.                                                      focus on two key aspects: (i) Improved generative models: These mod-
+                                                                                els are capable of learning complex distributions of molecular structures
+   Index Terms--Diffusion models, drug discovery, generative AI,                from vast datasets and generating new compounds with desired prop-
+knowledge representation.                                                       erties. By automating the molecular design process, generative models
+                                                                                can quickly propose viable drug candidates that match specific efficacy
+                           I. INTRODUCTION                                      and safety profiles, potentially leading to breakthroughs in the treat-
+                                                                                ment of diseases, and (ii) Knowledge Graphs (KGs) of biomedical
+   Drug discovery is an expensive endeavor, with costs often surging            data: KGs in drug discovery constitute a structured representation
+beyond the billion-dollar mark, primarily due to the extensive stages           of vast amounts of heterogeneous data, encompassing the relations
+involved in the development pipeline, ranging from target identification        between different entities such as genes, proteins, drugs, and diseases.
+to clinical evaluations [1]. Nevertheless, the advent of computational          By leveraging knowledge graphs, we can create interpretable and
+techniques and machine learning has ushered in a paradigm shift in              generalizable models that encapsulate both the biomedical knowledge
+pharmaceutical research, streamlining drug development, mitigating              encoded within the relationships and the data-driven insights garnered
+expenses, and enhancing the discovery of bioactive compounds [2].               from machine learning models. These graphs also enable a deeper
+Predominantly, the emergence of sophisticated machine learning appli-           analysis of biological pathways, off-target effects, and drug repurposing
+cations has substantially bolstered predictive capabilities, accelerating       opportunities.
+the pace of in-silico drug design [3]. However, this rapid progression
+has not been devoid of challenges. Present-day generative models                   Molecular generation is a critical aspect of drug discovery, material
+in machine learning showcase impressive results but often miss out              science, and chemical exploration. Generative models have demon-
+on tapping into the extensive biological knowledge available in the             strated the ability to generate novel structures across a variety of
+domain [4]. These models frequently grapple with issues like over-              representations, from 1-D SMILES strings to 2-D and 3-D molecular
+fitting, lack of generalizability to new data [5], and difficulties in          graphs. However, while these models have shown great results in
+handling novel drug or target interactions [6]. Although there is a vast        producing drug-like molecules, they are typically evaluated based on
+                                                                                their unconditioned generation capabilities. Generative models have
+   Received 5 April 2024; revised 14 September 2024; accepted 5 October 2024.   also achieved significant improvements in targeted generation with
+Date of publication 9 October 2024; date of current version 5 February 2025.    modalities like text, images [7], sound, and videos. The development
+The work of Aditya Malusare gratefully acknowledges the Walther Cancer          of a targeted generative model for graphs is of particular interest in the
+Foundation and supported by the Purdue University Institute for Cancer Re-      problem of drug discovery.
+search under Grant P30CA023168. This work uses the Anvil supercomputer at
+Purdue University through allocation CIS230228 from the Advanced Cyberin-          Biomedical knowledge can be organized and represented by a
+frastructure Coordination Ecosystem: Services & Support (ACCESS) program.       powerful tool called a Knowledge Graph. A good way of guid-
+(Corresponding author: Vaneet Aggarwal.)                                        ing the generative process is by using the KG as a structural and
+                                                                                semantic scaffold, which can provide context-relevant constraints
+   The authors are with the Edwardson School of Industrial Engineering and the  and objectives for the generative models. This integration of KGs
+Institute of Cancer Research, Purdue University, West Lafayette, IN 47907 USA   with generative models can facilitate the targeted generation of
+(e-mail: malusare@purdue.edu; vaneet@purdue.edu).                               molecules by driving the model to consider biological relevance and
+                                                                                plausibility in the generation process. By doing so, the models can
+   This article has supplementary downloadable material available at
+https://doi.org/10.1109/TCBB.2024.3477313, provided by the authors.
+
+   Digital Object Identifier 10.1109/TCBB.2024.3477313
+
+2998-4165 © 2024 IEEE. Personal use is permitted, but republication/redistribution requires IEEE permission.
+                   See https://www.ieee.org/publications/rights/index.html for more information.
+
+Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:31 UTC from IEEE Xplore. Restrictions apply.
+376  IEEE TRANSACTIONS ON COMPUTATIONAL BIOLOGY AND BIOINFORMATICS, VOL. 22, NO. 1, JANUARY/FEBRUARY 2025
+
+Fig. 1. KARL Model (a) Biomedical knowledge graph showing the links between drugs, target proteins, diseases, genes, biological pathways, etc. The edges
+represent different types of relationships like targeting, synergistic or unwanted interactions, or side effects. (b) We obtain Knowledge Graph Embeddings (KGEs)
+(Section IV) for the target drug candidate. (c) These embeddings are used to guide a generative process (Section V). (d) The end result of the generative process is
+a novel drug candidate.
+
+leverage both the relational knowledge embedded within the KG,             with domain constraints specific to drug-based knowledge, and 3) the
+such as the interactions between proteins, genes, drugs, and diseases,     development of a mapping from molecule-space to KGE-space that is
+and the generative capabilities to propose novel compounds that are        used for score-based conditional generation.
+more likely to exhibit desired therapeutic effects and pharmacological
+profiles.                                                                                            II. RELATED WORK
+
+   Incorporating KGs into generative modeling allows for a more               Molecular Generation: Molecular representations can be classified
+informed exploration of the chemical space, focusing on areas with         into three broad categories: (i) string-based (1-D), (ii) graph-based
+higher potential for successful drug development. The properties and       (2-D), and coordinate-based (3-D) representations. The simplified
+relationships within KGs can guide the generative model in synthesizing    molecular-input line-entry system (SMILES) [8] remains one of the
+molecules that not only are structurally novel but also align with known   most widespread implementations of the 1-D representation. SMILES
+biological pathways and mechanisms of action. This coupling can lead       has been used with a variety of models such as Variational Auto-
+to the development of generative models that produce candidates which      encoders (VAEs) [9], [10], Generative Adversarial Networks (GANs)
+are not only chemically valid but also biologically relevant. Moreover,    like [11], and Recurrent Neural Networks (RNNs) [12]. The simplified
+such directed generation can help in hypothesis generation for drug        nature of SMILES strings does not explicitly capture geometrical and
+repurposing and identifying previously unrecognized drug-target inter-     topological features. Additionally, small changes in the strings can
+actions, greatly enriching the pipeline of drug discovery and potentially  lead to vastly different or invalid molecular structures [13], which is
+reducing the timeline for the development of new therapies.                of considerable concern while using diffusion-based models. In order
+                                                                           to mitigate these problems, alternative models like [14], [15] using
+   We propose an novel model capable of end-to-end generation (Fig. 1)     the SELF-referencIng Embedded Strings (SELFIES) [16] have been
+called the Knowledge-Augmented Reinforcement Learning-optimized            developed which ensure validity and complete coverage of chemical
+(KARL) Model. This paper presents the following key innovations:           space.
+
+   1) A diffusion-based generative model for graphs steered with              Two-dimensional representations present the opportunity of directly
+       Discrete Diffusion Policy Optimization (DDPO) for improved          working with the structure of compounds. Although they do not take
+       molecule generation. The generative model, initially trained on     into account the 3-D structure of the molecule, 2-D graph-based
+       extensive chemical structure datasets, is fine-tuned with the       representations have achieved impressive results using models like
+       DDPO approach that rewards the model for producing chem-            GANs [17], normalizing flows [18], [19], and diffusion-based mod-
+       ically valid, pharmacologically active structures that have the     els [20], [21], [22], [23].
+       ability to satisfy user-defined properties. (Section III)
+                                                                              Knowledge-enhanced Models: Knowledge graphs have gained trac-
+   2) A Knowledge Graph Embedding (KGE) model that generates               tion in drug discovery [24] by structuring diverse biological data
+       contextual embeddings from large-scale biomedical databases         into interconnected frameworks that facilitate the identification of
+       that are used for targeted extrapolation and synthesis of drug      new therapeutic targets and drug repurposing opportunities [25], [26],
+       candidates. By reformulating models that generate KGEs from         [27]. These graphs represent entities such as molecules, proteins, and
+       energy-based models to ones that minimize a Maximum Like-           diseases as nodes, with edges capturing the connections and associa-
+       lihood Estimation (MLE) objective, we demonstrate the ability       tions between them by encoding predicates like `causes,' `indicates,'
+       to generate more meaningful embeddings that also incorporate        `interacts,' `targets,' etc. The paper by [28] showcases the use of
+       domain constraints, which ensure that predictions follow user-      entity embeddings from knowledge graphs for predicting drug-disease
+       specified logical formulae. (Section IV)                            associations, while [29] employed graph neural networks on similar
+                                                                           structures to uncover drug-target interactions, surpassing traditional
+   3) The development of a training workflow that is used by the           predictive models. By incorporating relational information from knowl-
+       model to learn conditional generation, with the help of a property  edge graphs, molecular generative models can impose biologically
+       inference network that integrates the knowledge represented by      relevant constraints during the generation process [30]. Knowledge
+       the KGEs into the training of the diffusion model to create a       graphs also aid in systematically identifying adverse drug reactions [31]
+       unified process for knowledge-enhanced novel drug discovery         and repurposing existing drugs by analyzing the network's topology to
+       (Section V)                                                         reveal hidden biological pathways [32].
+
+   The novelty of our framework lies in: 1) the extension of the
+DDPO procedure from the fixed topology of images to the variable
+message-passing framework of graphs, 2) the creation of a KGE model
+
+     Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:31 UTC from IEEE Xplore. Restrictions apply.
+IEEE TRANSACTIONS ON COMPUTATIONAL BIOLOGY AND BIOINFORMATICS, VOL. 22, NO. 1, JANUARY/FEBRUARY 2025                                            377
+
+III. MOLECULAR GENERATIVE MODEL                                              BioKG [37], PharmKG [26], and PrimeKG [27], which range from
+                                                                             10K to 10M nodes and up to 200M relations.
+   Molecular structures can be represented using a planar graph G =
+(X, A) where X  RN×M is a feature matrix for N nodes (heavy                     Knowledge Graph Embeddings (KGEs) are low dimensional rep-
+atoms) described by M -dimensional vectors encoding atom informa-            resentations of relations and entities that are used for various tasks
+tion, and A  RN×N is the adjacency matrix indicating the presence            like link prediction, graph completion and attribute inference. KGEs
+                                                                             are constructed with a scoring function G : E × R × E  R that
+of single, double or triple bonds between the nodes.                         measures the plausibility of any given triple.
+
+   Our generative model is built on the foundations of the GDSS [20]            KGEs help preserve the structure and information of neighbors, en-
+                                                                             abling the efficient encoding of the topology and semantic relationships
+and MOOD [33] diffusion models. Graph Diffusion via the System               inherent in knowledge graphs. Particularly in the biomedical domain,
+of SDEs (GDSS) defines the forward diffusion q of a graph Gt =               where the complexity of interactions is high, the capacity of KGEs
+(Xt, At) with a Stochastic Differential Equation (SDE):                      to facilitate the extraction of latent relationships between disparate
+                                                                             entities is crucial for advancements in drug repurposing, disease gene
+           dGt = ft(Gt) + gtdw        (1)                                    prioritization, and patient outcome prediction.
+
+where w is the standard Wiener process and ft and gt are the coefficients       KGE models involve various translational distance-based metrics
+of linear drift and scalar diffusion, respectively. GDSS performed           like TransE [38], tensor factorization methods such as RESCAL [39],
+well at generating molecular graphs, but its distributional learning         and neural network-based models like ConvE [40]. These models differ
+led to generated molecules closely resembling the training dataset.          in how they interpret the relationships and interactions between entities,
+The Molecular Out-of-distribution (MOOD) framework overcame the              and each comes with relative strengths and weaknesses with regard to
+restricted exploration space of the training process by modifying the        specific types of relational data and structures.
+above equation into a conditional SDE, with the marginal distribution
+of the forward process becoming p(Gt|yo = ). Here, yo represents                Traditionally, score-based KGE models have been interpreted as
+the OOD condition and the hyperparameter   [0, 1) tunes the "OOD-            energy-based models, where the score is seen as a measure of the
+ness" of the generative process. Controlling  allows MOOD to explore         negative energy of an (s, r, o) triplet. Recasting these models into
+areas outside the training space and generate novel molecules.               a probabilistic interpretation would enable exact training by Maxi-
+                                                                             mum Likelihood Estimation (MLE), as well as the ability to encode
+   Since we aim to use contextual information from KGs for our               domain constraints into the learning process. In order to transform
+generative model, we formulate an extension that samples from a more         these negative energies into probabilities over the E × R × E space,
+general marginal distribution p(Gt|c) conditioned on contextual data         we need to calculate the partition function, which is infeasible for
+c. We then introduce a RL-based objective to maximize a reward r:            large-scale biomedical KGs. [41] demonstrate that KGE models can be
+                                                                             represented by structured computational graphs, called circuits, which
+max Ecp(c),G0p(G0|c) [r(G0, c)]       (2)                                    are expressive probabilistic functions over the triplet space and can
+                                                                             be efficiently trained with MLE. This enables us to use KGE models
+   Black et al. [7] introduce a fine-tuning technique known as Denoising     as efficient generative models of new (s, r, o) triples, consistent with
+Diffusion Policy Optimization (DDPO) for image-based models. This            the statistics of existing the KG while guaranteeing the satisfaction of
+method excels in handling images by incorporating human feedback             constraints that would be crucial to pharmacological applications.
+to ensure metrics like aesthetic qualities--a factor typically difficult to
+quantify in computational models. Despite its success in the domain             The MLE objective is evaluated as:
+of images, extending these techniques to the realm of molecule op-
+timization presents significant challenges. The intricate dependencies       LMLE =            log p(s, r, o)
+between nodes and edges in molecular structures demand careful con-
+sideration, as these relationships are critical to determining the validity          (s,r,o)G
+and inherent properties of the molecules.
+                                                                             = -|G| log Z +                     pc(s, r, o)                     (4)
+   We introduce a reward function r that simultaneously prioritizes
+multiple molecular properties: (i) The drug-likeness Q of a molecule,                                 (s,r,o)G
+quantified by its QED score [34], (ii) the synthesizability S calculated
+using the SAScore [35] which is a rule-based determination of syn-              Circuit-based score functions bring down the complexity of evalu-
+thetic accessibility, and (iii) a provision for defining a property C in     ating Z from O(|E|2 · |R| · cost()) to O(|E + R| · cost()) [41].
+the chemical space like novelty/molecular similarity, docking scores,
+structure validity, etc.                                                        The generation of new (s, r, o) triplets is ensured to be seman-
+
+   We define our overall reward function as:                                 tically coherent within the rules of the KG by introducing domain
+
+r(G, c) =  1Q(G) + 2S(G) + 3C(G, c);  (3)                                    constraints [42] that modify the score functions with indicator func-
+                                                                             tions for valid triples. Given a relation r  R the subsets Sr, Or  E
+           -4,  if G is invalid                                              represent the sets of entities between which r is a valid relation. This
+                                                                             domain Kr = Sr  {r}  Or can be extended across all r to form K =
+   We elaborate on the training process of the model for conditional         rKr. We restrict the score function to only valid triples (s, r, o) 
+generation in Section V.                                                     K by introducing an indicator function cK in the score calculation
+                                                                             (s, r, o) = p(s, r, o) · cK (s, r, o). For example, in our experiments,
+              IV. KNOWLEDGE GRAPH EMBEDDINGS                                 we are particularly interested in drug-protein interaction. For this type of
+                                                                             relation r = targets, we restrict s  drugs and o  proteins.
+   A knowledge graph G, involving a set of entities E and relations          Once again, the circuit-based score functions help us train these models
+R, is a directed multigraph composed of triples (s, r, o)  E × R × E         with a complexity of O(|E + R| · cost() · cost(cK )).
+that represent the relation r between subject s and object o nodes. In
+biomedical knowledge graphs, E contains entities like drugs, diseases,          In order to generate KGEs (Fig. 1(c)), KARL uses the RotatE [43]
+genes, phenotypes, and biological pathways while R contains relations
+like interactions, drug targets and side effects. Some examples of public    algorithm with the above modifications to the training process in order
+domain knowledge graphs in this field like Hetionet [36], CKG [25],
+                                                                             to restrict the model to generate coherent triples. The embeddings
+
+                                                                             generated from the knowledge graph are used to guide the generative
+
+                                                                             process as described below.
+
+Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:31 UTC from IEEE Xplore. Restrictions apply.
+378                IEEE TRANSACTIONS ON COMPUTATIONAL BIOLOGY AND BIOINFORMATICS, VOL. 22, NO. 1, JANUARY/FEBRUARY 2025
+
+Fig. 2. Generative process. The random initialization of the molecular graph G converges to a valid non-benzeneoid aromatic compound called tropone through
+the diffusion model.
+
+                  V. IMPLEMENTATION OF KARL                                                                    TABLE I
+                                                                                         GENERATION RESULTS ON THE QM9 DATASET
+   An essential aspect of drug design is the ability to specify the
+target properties in our generative process. This section describes our
+implementation of the guidance scheme for our diffusion model, which
+we refer to as the conditional diffusion model. We first describe the
+creation of a regressor that predicts properties based on graph structure,
+and then formulate the conditional process that guides the diffusion
+model to push it to generate molecules with the desired properties.
+
+A. Property Inference Network P(G)                                                                    TABLE II
+                                                                                         GENERATION RESULTS ON ZINC
+   To guide the conditional generation process, we create a neural
+network to estimate knowledge-based embeddings c from a noised
+version of an input molecular graph GT . P(GT )  c is used to
+implement a modified version of the classifier guidance algorithm
+by [44]. While previous work by [33] and [21] uses a similar algorithm
+to guide conditional generative processes, ours is a novel approach
+that utilizes a combination of graph attention and convolutional layers
+to estimate knowledge-based embeddings, effectively creating a map
+between chemical space and KGE space.
+
+   P (G) = P(X, A) is constructed by first passing the feature X
+and adjacency matrices A through an aggregation operation:
+
+       H1 = (AXW0)                                (5)
+
+We then use a stack of self-attention layers:
+
+       hli+1 =     ij · Wlhlj                     (6)
+
+                j                                                           Gt log p(Gt) introduces variation into the trajectory and helps
+                                                                            explore newer regions.
+where
+                                                                               We model the conditional probability using a distribution of the form:
+       ij = SoftMax((Wal · [Wlhil  Wlhjl ]))      (7)
+                                                                                                     1
+   Here, Wl, Wal are learnable parameters at the l-th layer. The stack                   p (c|G)  =  Z  exp(- ||c  -  P(G)||2)                         (10)
+of attention layers produces a final output of dimension |c|. (Training
+                                                                            where  is a scaling factor and Z is the partition function. This
+details in Appendix B, available online)                                    procedure has a tractable complexity, supported by the analysis in
+
+B. Conditional Diffusion Training                                           Section IV.
+
+   The stochastic forward process described in (1) can be used for                                    VI. EXPERIMENTS
+generation by solving it's reverse-time version (Fig. 2):
+                                                                               We perform individual evaluations of each component, followed by
+       dGt = [ft(Gt) - gt2Gt log p(Gt)]dt + gtdw  (8)                       an end-to-end study of KARL in synthesizing novel drug candidates. We
+                                                                            compare unconditional generation against variants of generative models
+where t and w represent a reverse time-step and stochastic process. A       that use GANs [17], diffusion [20], [21], autoregressive methods [22],
+score network s is used to approximate Gt log pt(Gt) and simulate           and normalizing flows [18], [19].
+the reverse process in time, to generate Gt-1.
+                                                                            A. Evaluating Unconditional Molecular Generation
+   Conditioning this process can be achieved by adding the conditioning
+                                                                               Experimental Setup: The Quantum Machines 9 (QM9) [45] and
+information c at each diffusion step: p(Gt|c). The score network is         ZINC [46] datasets contain 134k and 250k chemical structures and
+then used to approximate the modified gradient Gt log p(Gt|c). The          are designed to aid in the exploration of chemical space. We follow
+conditional distribution is rearranged to give                              previous work [22] and perform unconditional generation of 10,000
+                                                                            molecular structures. We report the percentage of valid and unique
+   Gt log p(Gt|c)  Gt log p(Gt) + Gt log p(c|Gt) (9)                        molecules, along with the novelty as defined by [47] and the Frechet
+
+   The term Gt log p(c|Gt) in the above equation steers the
+model towards optimizing for the condition, while the first term
+
+       Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:31 UTC from IEEE Xplore. Restrictions apply.
+IEEE TRANSACTIONS ON COMPUTATIONAL BIOLOGY AND BIOINFORMATICS, VOL. 22, NO. 1, JANUARY/FEBRUARY 2025                                            379
+
+           TABLE III
+EVALUATION OF KGE MODEL
+
+ChemNet Distance (FCD) [48], which evaluates the similarity be-             drug-likeness and binding affinity to a target protein. The knowledge
+tween the generated and training datasets using the activations of the      graph used to generate embeddings and train the Property Inference
+penultimate layer of the ChemNet. The reward function (3) is used           Network is BioKG [37]. Following [33], we choose the targets: parp1,
+to fine-tune KARL for maximizing the validity and novelty of the            fa7, 5ht1b, braf, jak2. We set the chemical property C to empha-
+molecules.                                                                  size novelty, introducing a penalty for a similarity score > 0.4 with the
+                                                                            training dataset. The knowledge embeddings are generated by asking
+   Results: Tables I and II demonstrate that KARL achieves state-of-        the model to complete the triple (_____, targets, protein) for all
+the-art results on all metrics except the FCD on the QM9 dataset. We        five targets, searching over the molecule space for the highest scoring
+omit reporting uniqueness on ZINC since all models were 99.99%              embeddings. These embeddings are used for conditional generation as
+unique. Previous results sourced from [22]. KARL generates valid            desctribed in Section V.
+molecules at rates of 99.25% and 98.29% on QM9 and ZINC, respec-
+tively as a result of the fine-tuning procedure.                               Results: Table IV reports the average Docking Score (DS) of the top
+                                                                            5% of generated molecules. KARL is able to generate novel molecules
+B. Drug-Based Knowledge Graph Embeddings                                    with the best docking scores among the models we compare against,
+                                                                            with previous results sourced from [33]. The procedure for calculating
+   Experimental Setup: [49] devise a procedure to assess how well           these scores is described in Appendix B, available online.
+biomedical KGE models can predict missing links in knowledge graphs,
+standard evaluation employs knowledge graph metrics like Mean Re-           D. Ablation Study: Generation Without Reinforcement
+ciprocal Rank and Hits@k. These metrics measure the model's ability         Learning
+to rank true triples higher than corrupted ones in link prediction tasks.
+Models are evaluated on predicting both head and tail entities by              We perform an ablation study to examine the effect of fine-tuning
+corrupting each in turn. Robustness is examined by testing across           KARL with the reward function (3) by comparing the performance
+multiple random parameter initializations and dataset splits. Perfor-       before the fine-tuning procedure in Tables I and II. We find that even
+mance is evaluated on real-world KGs - BioKG [37] and Hetionet [36].        without DDPO, KARL has a similar performance as other diffusion-
+The following metrics are used for comparison: (i) Mean Reciprocal          and SDE-based systems. DDPO improves the validity and novelty
+Rank (MRR) (ii) Hits@1 and Hits@10 (iii) Adjusted Mean Rank [50].           to  99% , an improvement of 4-5% points over the non fine-tuned
+Hits@k is computed using the following procedure: For each corrupted        performance.
+triple (with head or tail entity removed) in the test set, the model ranks
+all possible candidate entities to complete the triple. A "hit" is when     E. Ablation Study: Generation Without Knowledge
+the true missing entity is ranked within the top k predictions. Hits@k      Enhancement
+calculates the proportion of test triples where the true entity was ranked
+in the top k .                                                                 We validate the impact of integrating KGEs into the model by
+                                                                            running the target protein experiments with a version of KARL that
+   Results: Table III presents the mean performance over 10 random          is fine-tuned using DDPO but not trained for conditional generation.
+seeds of all models and both datasets as measured by the above met-         Table IV shows that KARL without KGE information obtains molecules
+rics. Only the random seed used to initialize the model parameters is       that do not score as well in the docking metric. In most cases, the
+changed. The mean score of KARL outperforms all metrics except the          docking score is similar to that of GDSS, which is in line with our
+AMR score on BioKG, showing the improved quality of embeddings              expectations, since our base model is derived from a similar framework.
+due to the introduction of domain constraints. We compare against           The DDPO fine-tuning is identical in both cases. We thus demonstrate
+ComplEx [51], DistMult [52], RotatE [43], and TransE [38].                  that the incorporation of knowledge through embeddings leads to a
+                                                                            measurable improvement in targeted drug parameters. We can also
+C. Knowledge-Enhanced Drug Discovery: Novelty and                           consider a comparison between KARL and RotatE in Table III as an
+Protein Targeting                                                           ablation study, since our model is an improved version of RotatE with
+                                                                            the modifications in Section IV.
+   Experimental Setup: KARL generates 3,000 drug candidates
+with the reward function (3) calibrated to optimize synthesizability,
+
+Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:31 UTC from IEEE Xplore. Restrictions apply.
+380  IEEE TRANSACTIONS ON COMPUTATIONAL BIOLOGY AND BIOINFORMATICS, VOL. 22, NO. 1, JANUARY/FEBRUARY 2025
+
+                      TABLE IV
+     TOP 5% DOCKING SCORE (KCAL/MOL)
+
+                          VII. CONCLUSION                                            [13] A. Lavecchia, "Deep learning in drug discovery: Opportunities, challenges
+                                                                                           and future prospects," Drug Discov. Today, vol. 24, no. 10, pp. 2017­2032,
+   We enhance molecular generation and drug discovery models by                            2019.
+incorporating information from biomedical knowledge graphs into the
+generative process. This framework, called KARL, demonstrates: 1)                    [14] A. Yüksel, E. Ulusoy, A. Ünlü, and T. Dogan, "SELFormer: Molecular
+Performance on unconditional molecular generation on par with state-                       representation learning via selfies language models," Mach. Learn. Sci.
+of-the-art generative models, 2) Improvements in Knowledge Graph                           Technol., vol. 4, no. 2, 2023, Art. no. 025035.
+Embedding (KGE) metrics [58] by introducing domain constraints and
+reformulating the scoring process, and 3) Enhancement with KGEs                      [15] T. Danel, J. Leski, S. Podlewska, and I. T. Podolak, "Docking-based
+improves targeted generation, evaluated with docking scores for five                       generative approaches in the search for new drug candidates," Drug Discov.
+proteins.                                                                                  Today, vol. 28, no. 2, 2023, Art. no. 103439.
+
+   Through multiple experiments and ablation studies, we demonstrate                 [16] M. Krenn, F. Häse, A. Nigam, P. Friederich, and A. Aspuru-Guzik,
+that the extraction of embeddings from knowledge graphs and their use                      "Self-referencing embedded strings (SELFIES): A 100% robust molecular
+in guiding generative models leads to a measurable improvement in the                      string representation," Mach. Learn. Sci. Technol., vol. 1, no. 4, 2020,
+quality of generated drug candidates.                                                      Art. no. 045024.
+
+                                 REFERENCES                                          [17] K. Martinkus, A. Loukas, N. Perraudin, and R. Wattenhofer, "SPEC-
+                                                                                           TRE: Spectral conditioning helps to overcome the expressivity limits
+ [1] S. Morgan, P. Grootendorst, J. Lexchin, C. Cunningham, and D. Greyson,                of one-shot graph generators," in Proc. Int. Conf. Mach. Learn., 2022,
+      "The cost of drug development: A systematic review," Health Policy,                  pp. 15 159­15 179.
+      vol. 100, pp. 4­17, 2011.
+                                                                                     [18] C. Shi, M. Xu, Z. Zhu, W. Zhang, M. Zhang, and J. Tang, "GraphAF: A
+ [2] M. Rudrapal and D. Chetia, "Virtual screening, molecular docking and                  flow-based autoregressive model for molecular graph generation," in Proc.
+      QSAR studies in drug discovery and development programme," J. Drug                   Int. Conf. Learn. Representations, 2019, pp. 3733­3751.
+      Del. Therapeutics, vol. 10, pp. 225­233, 2020.
+                                                                                     [19] C. Zang and F. Wang, "MoFlow: An invertible flow model for generating
+ [3] A. Rifaioglu, H. Atas¸, M. Martin, R. Cetin-Atalay, V. Atalay, and T.                 molecular graphs," in Proc. 26th ACM SIGKDD Int. Conf. Knowl. Discov.
+      Dogan, "Recent applications of deep learning and machine intelligence                Data Mining, 2020, pp. 617­626.
+      on in silico drug discovery: Methods, tools and databases," Brief. Bioinf.,
+      vol. 20, pp. 1878­1912, 2018.                                                  [20] J. Jo, S. Lee, and S. J. Hwang, "Score-based generative modeling of graphs
+                                                                                           via the system of stochastic differential equations," in Proc. Int. Conf.
+ [4] T. Tian, S. Li, M. Fang, D. Zhao, and J. Zeng, "MolSHAP: Inter-                       Mach. Learn., 2022, pp. 10 362­10 383.
+      preting quantitative structure­activity relationships using shapley val-
+      ues of R-groups," J. Chem. Inf. Model., vol. 64, pp. 2236­2249,                [21] C. Vignac, I. Krawczuk, A. Siraudin, B. Wang, V. Cevher, and P. Frossard,
+      2023.                                                                                "DiGress: Discrete denoising diffusion for graph generation," in Proc.
+                                                                                           11th Int. Conf. Learn. Representations, 2023. [Online]. Available: https:
+ [5] J. Ma, R. Sheridan, A. Liaw, G. Dahl, and V. Svetnik, "Deep neural nets               //openreview.net/forum?id=UaAD-Nu86WX
+      as a method for quantitative structure­activity relationships," J. Chem. Inf.
+      Model., vol. 55, pp. 263­274, 2015.                                            [22] L. Kong, J. Cui, H. Sun, Y. Zhuang, B. A. Prakash, and C. Zhang,
+                                                                                           "Autoregressive diffusion model for graph generation," 2023. [Online].
+ [6] T. Nguyen, T. Nguyen, and T. Tran, "Mitigating cold-start problems in                 Available: https://openreview.net/forum?id=98J48HZXxd5
+      drug-target affinity prediction with interaction knowledge transferring,"
+      Brief. Bioinf., vol. 23, 2022, Art. no. bbac269.                               [23] S. Guo, J. Guan, and S. Zhou, "Diffusing on two levels and optimizing
+                                                                                           for multiple properties: A novel approach to generating molecules with
+ [7] K. Black, M. Janner, Y. Du, I. Kostrikov, and S. Levine, "Training diffusion          desirable properties," 2023, arXiv:2310.04463.
+      models with reinforcement learning," 2023, arXiv:2305.13301.
+                                                                                     [24] T. James and H. Hennig, Knowledge Graphs and Their Applications in
+ [8] D. Weininger, "Smiles, a chemical language and information system. 1.                 Drug Discovery. Berlin, Germany: Springer, Sep. 2023, pp. 203­221.
+      Introduction to methodology and encoding rules," J. Chem. Inf. Comput.               [Online]. Available: http://dx.doi.org/10.1007/978-1-0716-3449-3_9
+      Sci., vol. 28, no. 1, pp. 31­36, 1988.
+                                                                                     [25] A. Santos et al., "A knowledge graph to interpret clinical proteomics
+ [9] W. Jin, R. Barzilay, and T. Jaakkola, "Junction tree variational autoencoder          data," Nature Biotechnol., vol. 40, no. 5, pp. 692­702, Jan. 2022. [Online].
+      for molecular graph generation," in Proc. Int. Conf. Mach. Learn., 2018,             Available: http://dx.doi.org/10.1038/s41587-021-01145-6
+      pp. 2323­2332.
+                                                                                     [26] S. Zheng et al., "PharmKG: A dedicated knowledge graph benchmark
+[10] R. Gómez-Bombarelli et al., "Automatic chemical design using a data-                  for bomedical data mining," Brief. Bioinf., vol. 22, no. 4, Dec. 2020,
+      driven continuous representation of molecules," ACS Central Sci., vol. 4,            Art. no. bbaa344. [Online]. Available: http://dx.doi.org/10.1093/bib/
+      no. 2, pp. 268­276, 2018.                                                            bbaa344
+
+[11] H. Tang et al., "EarlGAN: An enhanced actor­critic reinforcement learning       [27] P. Chandak, K. Huang, and M. Zitnik, "Building a knowledge graph to
+      agent-driven GAN for de novo drug design," Pattern Recognit. Lett.,                  enable precision medicine," Sci. Data, vol. 10, no. 1, Feb. 2023, Art. no. 67.
+      vol. 175, pp. 45­51, 2023.                                                           [Online]. Available: http://dx.doi.org/10.1038/s41597-023-01960-3
+
+[12] D. Neil et al., "Exploring deep recurrent models with reinforcement learn-      [28] Z. Yu, F. Huang, X. Zhao, W. Xiao, and W. Zhang, "Predicting drug­
+      ing for molecule design," 2018. [Online]. Available: https://openreview.             disease associations through layer attention graph convolutional network,"
+      net/forum?id=Bk0xiI1Dz                                                               Brief. Bioinf., vol. 22, no. 4, 2021, Art. no. bbaa243.
+
+                                                                                     [29] M. Zitnik, M. Agrawal, and J. Leskovec, "Modeling polypharmacy side
+                                                                                           effects with graph convolutional networks," Bioinformatics, vol. 34, no. 13,
+                                                                                           pp. i457­i466, 2018.
+
+                                                                                     [30] C. Bilodeau, W. Jin, T. Jaakkola, R. Barzilay, and K. F. Jensen, "Gen-
+                                                                                           erative models for molecular discovery: Recent advances and chal-
+                                                                                           lenges," Wiley Interdiscipl. Rev. Comput. Mol. Sci., vol. 12, no. 5, 2022,
+                                                                                           Art. no. e1608.
+
+     Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:31 UTC from IEEE Xplore. Restrictions apply.
+IEEE TRANSACTIONS ON COMPUTATIONAL BIOLOGY AND BIOINFORMATICS, VOL. 22, NO. 1, JANUARY/FEBRUARY 2025                                            381
+
+[31] V. Novácek and S. K. Mohamed, "Predicting polypharmacy side-effects              [46] J. J. Irwin, T. Sterling, M. M. Mysinger, E. S. Bolstad, and R. G. Coleman,
+      using knowledge graph embeddings," in AMIA Summits Transl. Sci. Proc.,                "ZINC: A free tool to discover chemistry for biology," J. Chem. Inf. Model.,
+      vol. 2020, 2020, Art. no. 449.                                                        vol. 52, no. 7, pp. 1757­1768, 2012.
+
+[32] X. Pan et al., "Deep learning for drug repurposing: Methods, databases,          [47] W. Jin, R. Barzilay, and T. Jaakkola, "Multi-objective molecule generation
+      and applications," Wiley Interdiscipl. Rev. Comput. Mol. Sci., vol. 12, no. 4,        using interpretable substructures," in Proc. Int. Conf. Mach. Learn., 2020,
+      2022, Art. no. e1597.                                                                 pp. 4849­4859.
+
+[33] S. Lee, J. Jo, and S. J. Hwang, "Exploring chemical space with score-            [48] K. Preuer, P. Renz, T. Unterthiner, S. Hochreiter, and G. Klambauer,
+      based out-of-distribution generation," 2022, arXiv:2206.07632. [Online].              "Fréchet ChemNet distance: A metric for generative models for molecules
+      Available: https://api.semanticscholar.org/CorpusID:249674702                         in drug discovery," J. Chem. Inf. Model., vol. 58, no. 9, pp. 1736­1741,
+                                                                                            2018.
+[34] G. R. Bickerton, G. V. Paolini, J. Besnard, S. Muresan, and A. L. Hopkins,
+      "Quantifying the chemical beauty of drugs," Nature Chem., vol. 4, no. 2,        [49] S. Bonner et al., "Understanding the performance of knowledge graph
+      pp. 90­98, 2012.                                                                      embeddings in drug discovery," Artif. Intell. Life Sci., vol. 2, Dec. 2022,
+                                                                                            Art. no. 100036. [Online]. Available: http://dx.doi.org/10.1016/j.ailsci.
+[35] P. Ertl and A. Schuffenhauer, "Estimation of synthetic accessibility score             2022.100036
+      of drug-like molecules based on molecular complexity and fragment
+      contributions," J. Cheminformatics, vol. 1, pp. 1­11, 2009.                     [50] M. Berrendorf, E. Faerman, L. Vermue, and V. Tresp, "On the ambiguity
+                                                                                            of rank-based evaluation of entity alignment or link prediction methods,"
+[36] D. S. Himmelstein et al., "Systematic integration of biomedical knowledge              2020, arXiv: 2002.06914.
+      prioritizes drugs for repurposing," Elife, vol. 6, 2017, Art. no. e26726.
+                                                                                      [51] T. Trouillon, C. R. Dance, É. Gaussier, J. Welbl, S. Riedel, and G.
+[37] B. Walsh, S. K. Mohamed, and V. Novácek, "BioKG: A knowledge graph                     Bouchard, "Knowledge graph completion via complex tensor factoriza-
+      for relational learning on biological data," in Proc. 29th ACM Int. Conf.             tion," J. Mach. Learn. Res., vol. 18, no. 130, pp. 1­38, 2017.
+      Inf. Knowl. Manage., 2020, pp. 3173­3180.
+                                                                                      [52] Z. Zhang, F. Zhuang, M. Qu, F. Lin, and Q. He, "Knowledge graph embed-
+[38] Y. Lin, Z. Liu, M. Sun, Y. Liu, and X. Zhu, "Learning entity and relation              ding with hierarchical relation structure," in Proc. 2018 Conf. Empirical
+      embeddings for knowledge graph completion," in Proc. AAAI Conf. Artif.                Methods Natural Lang. Process., 2018, pp. 3198­3207.
+      Intell., 2015, pp. 2181­2187.
+                                                                                      [53] M. Olivecrona, T. Blaschke, O. Engkvist, and H. Chen, "Molecular de-
+[39] M. Nickel et al., "A three-way model for collective learning on multi-                 novo design through deep reinforcement learning," J. Cheminformatics,
+      relational data," in Proc. Int. Conf. Mach. Learn., 2011, pp. 3 104 482­3             vol. 9, no. 1, pp. 1­14, 2017.
+      104 584.
+                                                                                      [54] W. Jeon and D. Kim, "Autonomous molecule generation using reinforce-
+[40] T. Dettmers, P. Minervini, P. Stenetorp, and S. Riedel, "Convolutional 2D              ment learning and docking to develop potential novel inhibitors," Sci. Rep.,
+      knowledge graph embeddings," in Proc. AAAI Conf. Artif. Intell., 2018,                vol. 10, Dec. 2020, Art. no. 22104.
+      pp. 1811­1818.
+                                                                                      [55] W. Jin, R. Barzilay, and T. Jaakkola, "Hierarchical generation of molecular
+[41] L. Loconte, N. D. Mauro, R. Peharz, and A. Vergari, "How to turn your                  graphs using structural motifs," in Proc. Int. Conf. Mach. Learn., 2020,
+      knowledge graph embeddings into generative models," in Proc. 37th Conf.               pp. 4839­4848.
+      Neural Inf. Process. Syst., 2023, Art. no. 3395. [Online]. Available: https:
+      //openreview.net/forum?id=RSGNGiB1q4                                            [56] S. Yang, D. Hwang, S. Lee, S. Ryu, and S. J. Hwang, "Hit and lead
+                                                                                            discovery with explorative RL and fragment-based molecule generation,"
+[42] K. Ahmed, S. Teso, K.-W. Chang, G. Van den Broeck, and A. Vergari,                     2021, arXiv:2110.01219.
+      "Semantic probabilistic layers for neuro-symbolic learning," in Proc. Int.
+      Conf. Neural Inf. Process. Syst., 2022, pp. 29 944­29 959.                      [57] J. Jo, S. Lee, and S. J. Hwang, "Score-based generative modeling of graphs
+                                                                                            via the system of stochastic differential equations," in Proc. 39th Int. Conf.
+[43] Z. Sun, Z.-H. Deng, J.-Y. Nie, and J. Tang, "RotatE: Knowledge                         Mach. Learn., 2022, pp. 10362­10383.
+      graph embedding by relational rotation in complex space," 2019, arXiv:
+      1902.10197.                                                                     [58] M. Ali et al., "PyKEEN 1.0: A Python library for training and evaluating
+                                                                                            knowledge graph embeddings," J. Mach. Learn. Res., vol. 22, no. 82,
+[44] J. Sohl-Dickstein, E. Weiss, N. Maheswaranathan, and S. Ganguli, "Deep                 pp. 1­6, 2021. [Online]. Available: http://jmlr.org/papers/v22/20--825.
+      unsupervised learning using nonequilibrium thermodynamics," in Proc.                  html
+      Int. Conf. Mach. Learn., 2015, pp. 2256­2265.
+
+[45] R. Ramakrishnan, P. O. Dral, M. Rupp, and O. A. Von Lilienfeld, "Quan-
+      tum chemistry structures and properties of 134 kilo molecules," Sci. Data,
+      vol. 1, no. 1, pp. 1­7, 2014.
+
+Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:31 UTC from IEEE Xplore. Restrictions apply.
+

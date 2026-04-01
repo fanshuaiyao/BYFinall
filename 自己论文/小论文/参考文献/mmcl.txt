@@ -1,0 +1,999 @@
+                This article has been accepted for publication in IEEE Transactions on Computational Biology and Bioinformatics. This is the author's version which has not been fully edited and
+                                                   content may change prior to final publication. Citation information: DOI 10.1109/TCBBIO.2026.3663206
+                                                                                                                                                                                                              1
+
+MMCL: A Multi-modal Contrastive Learning
+Framework for Molecular Property Prediction
+
+                                              Mei Gao , Fei Zhu
+
+   Abstract--Accurately predicting molecular proper-               representations as input, including Simplified Molecular
+ties can identify more promising drug candidates and               Input Line Entry System (SMILES), molecular graphs,
+facilitate the process of drug discovery. There are                etc. Nevertheless, as SMILES is a sequence representation
+advances in methods for molecular property prediction              [8], it cannot represent the spatial relationship between
+using self-supervised learning. However, most methods              atoms, which corresponds to different properties [9]. The
+tend to focus only on a certain representation, resulting          molecular graph provides a more direct representation
+in reduced information diversity. Moreover, less atten-            that treats atoms as nodes and chemical bonds as edges,
+tion is paid to the functional groups in the molecule,             which helps capture the positional relationships in space
+which are highly related to the molecular properties.              among atoms in a molecule [9].
+To solve the problem, a multimodal contrastive learn-
+ing framework called MMCL for molecular property                      Since SMILES sequences resemble natural languages,
+prediction is proposed, which learns common features               sequence-based molecular property prediction methods
+among similar molecules by utilizing different views               usually adopt methods from the natural language process-
+of molecules for predicting molecular properties. In               ing domain to embed SMILES sequences. For example,
+addition, by explicitly representing functional groups             convolutional neural network-based methods [10], [11] pro-
+as nodes in the molecular graph, the model is prompted             cess SMILES sequences as fixed-length vectors by padding
+to learn features related to molecular properties. Pre-            or truncation, process the input through CNN layers,
+diction results on benchmark datasets and a series of              and add to fully connected layers to predict the result.
+case studies show that MMCL has optimal performance                Methods based on recurrent neural networks (RNNs) [12]­
+in most property prediction tasks and can capture                  [15] increase model prediction accuracy by improving RNN
+information related to chemical semantics. Overall,                models. In addition, some studies have considered the key
+MMCL can be used as an efficient deep learning tool for            role of functional groups in molecules and developed meth-
+molecular-related tasks to facilitate the drug discovery           ods for extracting functional groups hidden in SMILES [9].
+process.                                                           These functional groups affect the properties and activity
+                                                                   of molecules.
+   Index Terms--Molecular representation, molecu-
+lar property prediction, contrastive learning, self-                  Recently, graph neural networks (GNNs) have shown
+supervised learning                                                strong effectiveness in modeling graph-structured data.
+                                                                   Essentially, they aggregate neighborhood information to
+                          I. Introduction                          update node characteristics, and can simultaneously cap-
+                                                                   ture graph structure and node/edge features. Researchers
+M OLECULAR property prediction is a key issue in                   have proposed many methods for predicting molecular
+          drug discovery [1]. Precisely predicting the prop-       graph properties under supervised learning [16], [17]. How-
+erties of molecules helps to identify more promising drug          ever, molecular datasets are highly heterogeneous and rela-
+candidates, reduce the average new drug development                tively small, usually with sparse and incomplete property
+cost, and accelerate the entire drug discovery process [2].        labels [18]. To overcome this problem, researchers intro-
+Computer-aided drug design (CADD), such as quantita-               duced graph self-supervised learning (SSL), which uses
+tive structure-activity relationships (QSAR) and ADME              extensive unlabeled data to extract intrinsic knowledge via
+models [3], [4], as an alternative to experimental anal-           designed pretext tasks. It reduces the reliance on data with
+ysis of molecular properties, reduces the attrition rate           labels while also improving the generalization of models.
+of drug development due to poor pharmacokinetics and               Current graph SSL approaches are generally categorized
+bioavailability [5]. However, most of them rely on features        into two main paradigms: contrast and generation [18].
+designed based on expert knowledge [6]. Advances in learn-         Contrastive graph SSL methods [19]­[24], [28] construct
+ing molecular representations directly from observed data          positive and negative samples through different augmen-
+using deep learning have attracted a wide range of interest        tations, prompting the model to capture common features
+[7]. These methods are trained with various molecular              of similar molecules in different views [19]. The generative
+                                                                   graph SSL methods [25]­[27], on the other hand, treat the
+   This work was supported by National Natural Science Foundation  graph structure or attributes as self-supervision signals.
+of China (62576233). (Corresponding author: Fei Zhu)               They mask a portion of the graph data and train the
+                                                                   model to reconstruct the missing information from the
+   Mei Gao is with the School of Computer Science and Tech-
+nology, Soochow University, Suzhou 215006, China. (e-mail:
+20225227063@stu.suda.edu.cn)
+
+   Fei Zhu is with the School of Computer Science and Tech-
+nology, Soochow University, Suzhou 215006, China. (e-mail:
+zhufei@suda.edu.cn)
+
+Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:13 UTC from IEEE Xplore. Restrictions apply.
+                   © 2026 IEEE. All rights reserved, including rights for text and data mining and training of artificial intelligence and similar technologies. Personal use is permitted,
+
+                                            but republication/redistribution requires IEEE permission. See https://www.ieee.org/publications/rights/index.html for more information.
+This article has been accepted for publication in IEEE Transactions on Computational Biology and Bioinformatics. This is the author's version which has not been fully edited and
+                                   content may change prior to final publication. Citation information: DOI 10.1109/TCBBIO.2026.3663206
+
+                                                                                                                                                                                                2
+
+remaining context, thereby capturing intrinsic structural          results verified that each part plays a vital role in
+and semantic dependencies.                                         MMCL.
+
+   However, most existing methods focus only on ex-             The remainder of this paper is organized as follows.
+tracting molecular features from SMILES sequences or         Section II introduced related work. Section III presents the
+molecular graphs, ignoring the fact that different kinds     proposed multi-modal contrastive learning framework for
+of inputs can provide richer information than a single       molecular property prediction. In Section IV, we conduct
+representation. Du et al. [29] incorporated messages from    a series of comparative studies on benchmark sets of data
+two modalities in the prediction of the metabolic stability  that illustrate the validity of our model. In Section V, we
+of molecules, but they simply concatenated the two pieces    draw a conclusion.
+of information for label prediction. Similarly, Wu et al.
+[30] also used the aggregated information to utilize the                             II. Related Work
+two kinds of information. Although functional groups are
+highly correlated with molecular properties and activities,  A. Graph-based self-supervised learning methods
+only a few methods make use of them in graph SSL. For
+example, Zhu et al. [31] predicted molecular properties         Due to the small dataset of labeled molecules, super-
+using functional groups together with molecular graphs.      vised models have poor generalization ability in prop-
+                                                             erty prediction. Inspired by successful experiences of pre-
+   In this study, we present a multimodal contrastive        training in computer vision, researchers have proposed
+learning framework called MMCL for molecular property        many pre-training models that alleviate the problems asso-
+prediction, which exploits complementarity in multimodal     ciated with label sparsity. Hu et al. [32] set up prediction
+information to couple molecular graphs and SMILES se-        tasks at the node level and graph level to alleviate the
+quence information. Specifically, MMCL consists of two       negative migration issue. Similarly, Zang et al. [28] design
+modules; In the graph-graph contrastive learning module,     node-level and graph-level prediction tasks on hierarchical
+we adopt the hierarchical molecular graph as the molecular   molecular graphs. These methods construct pseudo-labels
+representation, where the motif nodes represent functional   based on the attributes of the data, which assist in learn-
+groups in the molecule and also serve as a bridge for        ing molecular representations. However, they rely on the
+interactions between lower-order atoms and higher-order      design of the pseudo-label and easily ignore differences in
+molecules. We use attribute masking to obtain augmented      the overall structure of samples.
+views and construct contrastive learning tasks. Besides, we
+add an attribute prediction task to motivate our model          Methods that follow the contrastive learning frame-
+towards recovering node attributes using contextual mes-     work are divided into cross-scale contrasts and same-scale
+sages. In the graph-sequence contrastive learning module,    contrasts [33]. InfoGraph [34] is a cross-scale comparison
+a sequence encoder based on a bidirectional gated recur-     method that maximizes the mutual information of molec-
+rent unit (BiGRU) is designed to capture molecular fea-      ular graphs and their subgraphs. Among the same-scale
+tures related to structural context and maximize its con-    comparison methods, You et al. [19] designed four graph
+sistency with graph representation through the contrastive   augmentation methods, using two randomly perturbed
+learning tasks. Experimental results show that MMCL is       versions of the molecular graph as contrastive positive
+effective in learning the intrinsic knowledge of molecules,  examples. Sun et al. [23] implemented graph augmentation
+and that different views of information play a vital role    using domain knowledge, considering the global structure
+in the pretraining process. Our major contributions are      of the dataset. However, acquiring such domain knowl-
+summarized as follows:                                       edge is often costly and limits applicability to large-scale
+                                                             datasets. To mitigate this reliance on expert knowledge,
+   · We proposed a new multimodal contrastive learn-         Wang et al. [35] proposed three domain-agnostic augmen-
+      ing framework for learning molecular representations,  tation methods for molecular graphs.
+      named MMCL. Specifically, MMCL integrates in-
+      formation in different molecular modes for learning       Some methods learn graph representations based on
+      chemical knowledge. Meanwhile, it also considers the   graph generation. For example, GraphMAE [25] proposes
+      important relationship between functional groups and   reconstruction methods for node features, and MGAE [36],
+      molecular properties.                                  and MaskGAE [37] mask and reconstruct paths of graphs.
+
+   · We construct a graph-sequence contrastive learning      B. Graphical augmentation methods
+      task, where the SMILES sequences and molecular
+      graphs derived from the same molecules were used          We introduce augmentation methods for molecular
+      as positive samples, and the model is trained by       graphs in this section. In computer vision fields, there
+      maximizing the consistency between positive sam-       are various data augmentations such as geometric trans-
+      ple representations, rather than simply concatenating  formations, color transformations, and image cropping.
+      them.                                                  However, graph augmentation is not intuitive and difficult
+                                                             to migrate from image augmentation methods [38]. To-
+   · We conducted comprehensive experiments that indi-       ward producing high-quality contrast samples, researchers
+      cate that our MMCL performs well in most prediction    explored various augmentations on graphs, including node
+      tasks. In addition, the contribution of each module    dropping, edge perturbation, attribute masking, subgraph,
+      was evaluated in the ablation experiments, and the     subgraph removal, and substructure substitution.
+
+Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:13 UTC from IEEE Xplore. Restrictions apply.
+                   © 2026 IEEE. All rights reserved, including rights for text and data mining and training of artificial intelligence and similar technologies. Personal use is permitted,
+
+                                            but republication/redistribution requires IEEE permission. See https://www.ieee.org/publications/rights/index.html for more information.
+This article has been accepted for publication in IEEE Transactions on Computational Biology and Bioinformatics. This is the author's version which has not been fully edited and
+                                   content may change prior to final publication. Citation information: DOI 10.1109/TCBBIO.2026.3663206
+
+                                                                                                                                                                                                3
+
+   Node dropping [19] randomly discards nodes and edges      show strong semantic correlation with the original graphs.
+connected to them in the graph. Edge Perturbation
+[19] randomly adds or removes edges from the graph.          C. Contrastive Learning Paradigm
+Typically, the augmentation graphs generated by these
+two augmentations have a different biological meaning           Contrastive graph SSL uses the commonality and dif-
+from the original molecule, altering their properties [23].  ference information of sample pairs as supervised signals
+Some methods [19], [35]removal extract subgraphs and         for learning the prior distribution of the data samples.
+mask subgraphs in a random walk manner, however,             Contrastive learning avoids the problems of label depen-
+which makes it impossible to guarantee that the aug-         dence, pseudo-correlation, and poor model generalization
+mentation graph still represents the main function of        performance in traditional supervised learning, which is
+the molecule. Substructure substitution replaces valid       widely used in various domains.
+substructures with bioelectronic bioisomers that will not
+significantly alter molecular properties, but it requires a     In computer vision fields, contrastive learning addresses
+deep understanding of the domain. Attribute masking [19]     the problem of learning a priori knowledge distributions
+randomly masks the attributes of graph nodes without         with a limited set of labeled datasets. There was no unified
+destroying their structure. Attribute masking does not       paradigm in the early stages of development [39]­[41].
+require domain knowledge, and the augmented graphs           Subsequent works [42]­[46] gradually developed a con-
+                                                             trastive learning framework based on negative examples.
+
+Fig. 1: Overview of the MMCL. MMCL consists of two parts: one is the graph-graph contrastive learning module,
+and the other is the graph-sequence contrastive learning module. For a molecule, its molecular graph and SMILES
+sequence are first processed as follows: a hierarchical molecular graph is constructed based on the improved algorithm of
+BRICS, an enhanced graph is obtained by using attribute masking, and the SMILES sequence is vector-embedded using
+one-hot encoding. Subsequently, their representations are learned through the graph encoder and sequence encoder,
+respectively. We set two contrastive tasks to maximize the consistency between different molecular representations,
+and set an attribute prediction task to enhance the pre-trained model's ability to reconstruct atomic properties.
+
+            Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:13 UTC from IEEE Xplore. Restrictions apply.
+                                 © 2026 IEEE. All rights reserved, including rights for text and data mining and training of artificial intelligence and similar technologies. Personal use is permitted,
+                                                           but republication/redistribution requires IEEE permission. See https://www.ieee.org/publications/rights/index.html for more information.
+This article has been accepted for publication in IEEE Transactions on Computational Biology and Bioinformatics. This is the author's version which has not been fully edited and
+                                   content may change prior to final publication. Citation information: DOI 10.1109/TCBBIO.2026.3663206
+
+                                                                                                                                                                                                4
+
+Fig. 2: we first decompose a molecular graph based on the improved algorithm of BRICS, the resulting fragments that
+usually have chemical properties are added to the molecular graph as motif nodes and connected to the atom nodes
+that constitute them. A graph-level node is also added to connect these motif nodes.
+
+This framework is implemented as follows: given an image,    B. Graph-graph Contrastive Learning Module
+the semantically identical pairs of positive samples are
+obtained by data augmentation and mapped to the vector          Molecular graphs naturally display the topological
+space using a predefined encoder and projection header.      structure of molecules, and these structural features deter-
+The training loss is set to reduce the distance of positive  mine the physicochemical properties and biological func-
+instances and increase the distance of negative instances    tions of molecules. Nodes and edges in molecular graphs
+in the vector space. Researchers also explored multimodal    usually represent atoms and bonds of molecules, respec-
+contrast learning, such as clip [47], a pre-training method  tively. In order to further integrate local and global infor-
+based on contrasting text-image pairs, which uses text as    mation in molecules into molecular graphs, we use hierar-
+a supervisory signal to train relocatable visual models.     chical molecular graphs [28] instead of traditional molec-
+                                                             ular graphs as input, which has been shown to be able
+   In recent years, to address the problem of labeled        to realize the interaction between low-order atoms and
+dataset size limitation in molecular property prediction,    high-order molecules, better explore the internal chemical
+researchers have proposed a series of pre-training methods   structure of molecules, and help the model learn more
+[19], [20], [23], [34], [35].                                comprehensive representations. Subsequently, we design a
+                                                             contrastive learning task based on attribute mask augmen-
+                        III. Methodology                     tation [19] to learn the representation of compounds.
+
+A. Overview                                                     Specifically, we first decompose the molecular graph
+                                                             into multiple fragments based on the improved algorithm
+   We propose a multimodal contrastive learning frame-       of BRICS, which usually has many chemical properties.
+work called MMCL for molecular property prediction. As       These fragments are added to the molecular graph as
+shown in Fig. 1, MMCL consists of two components: a          motif nodes and connected to the atoms that constitute
+graph­graph contrastive learning module and a graph­         them. In addition, a graph-level node is added to connect
+sequence contrastive learning module. For each molecule,     these motif nodes. The final hierarchical molecular graph
+its molecular graph and SMILES sequence are processed        representation is:
+by two modality-specific encoders.
+                                                             G = (V, E)
+   Specifically, in the graph­graph contrastive learning
+module, a hierarchical molecular graph is constructed        V = [Va, Vm, Vg]                                                                                                                (1)
+based on an improved BRICS decomposition to enable in-
+teractions between low-order atoms and high-order molec-     E = [Ea, Em, Eg]
+ular substructures. An augmented view of the hierarchical
+graph is then generated via attribute masking, and both      where Va, Vm, and Vg represent atomic nodes, motif
+the original and augmented graphs are encoded by a graph     nodes and graph-level nodes respectively, Ea represents the
+encoder to learn structure-aware molecular representa-       chemical bonds between atoms, Em represents the edges
+tions. In the graph­sequence contrastive learning module,    between motif fragments and the atoms that constitute
+the SMILES sequence is first transformed into a vector       them, and Eg represents the edges between graph-level
+representation via one-hot encoding and subsequently pro-    nodes and motif nodes. Fig. 2 illustrates the construction
+cessed by a BiGRU-based sequence encoder. An attention-      process of the hierarchical molecular graph.
+based aggregation layer is further applied to the BiGRU
+hidden states to obtain a compact sequence-level represen-      In the pre-training stage, we preprocess the compound
+tation. The consistency between the graph representation     into a hierarchical molecular graph as input, and use the
+and the sequence representation is maximized through         graph-level node representation as the molecular represen-
+a cross-modal contrastive objective, encouraging the two     tation. In the fine-tuning stage, we assume that the graph
+modalities to capture complementary yet aligned semantic     encoder has learned the relationship between the internal
+information.                                                 chemical structure of the molecule and the feature repre-
+                                                             sentation through pre-training. Thus, we use a generalized
+
+Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:13 UTC from IEEE Xplore. Restrictions apply.
+                   © 2026 IEEE. All rights reserved, including rights for text and data mining and training of artificial intelligence and similar technologies. Personal use is permitted,
+
+                                            but republication/redistribution requires IEEE permission. See https://www.ieee.org/publications/rights/index.html for more information.
+             This article has been accepted for publication in IEEE Transactions on Computational Biology and Bioinformatics. This is the author's version which has not been fully edited and
+                                                content may change prior to final publication. Citation information: DOI 10.1109/TCBBIO.2026.3663206
+
+                                                                                                                                                                                                             5
+
+approach for obtaining graph-level representations, that is,             ues. For each node, GIN learns its representation through
+we do not construct a hierarchical molecular graph, and
+the molecular representation is obtained by pooling atomic               a message passing framework, that is, aggregating features
+nodes.
+                                                                         of neighboring nodes and updating the representation of
+   In the pre-training stage, after obtaining the hierarchical
+molecular graph, we designed a contrastive learning task                 the current node. Specifically, the representation hv of the
+based on attribute masking augmentation for supervised                   l-th layer node v is defined as follows:
+model training. Attribute masking augmentation prompts
+the model to use context(i.e., remaining nodes)information                       hv(l)  =  MLP((1  +  (l))h(vl-1)  +              hu(l-1))                                                   (5)
+to restore masked node attributes. Since the structure of
+a molecule directly affects the properties of the molecule,                                                               uN (v)
+this augmentation method does not change the structure
+of the graph, so it has less impact on the properties of the             where h(vl-1) and h(ul-1) represent the representation of the
+molecule and will not have much impact on model pre-                     l-th layer node v and the neighbor node u respectively, and
+diction [19]. Specifically, we select a certain proportion of            (l) is a learnable weight parameter.
+atomic-level nodes from the hierarchical molecular graph
+G, discard the attributes of these nodes, and thus construct             C. Graph-sequence Contrastive Learning Module
+an augmented graph Gaug. We compare the hierarchical
+molecular graph G with the augmented graph Gaug to                       We introduce the construction process of the sequence
+maximize the consistency of their feature representations.
+In the pre-training stage, we randomly extract a batch of                encoder and graph-sequence contrastive learning task in
+data, and the contrast loss function of the n-th sample in
+this batch is defined as follows:                                        this section. We incorporate information from two modes,
+
+                                                                         namely graph and sequence, into the pre-training frame-
+
+                                                                         work, and prompt the model to learn the representation
+
+                                                                         of molecules from different modes by setting contrastive
+
+                                                                         learning tasks. In order to capture the contextual informa-
+
+                                                                         tion of the sequence, we design a BiGRU-based sequence
+
+                                                                         encoder to learn compound representations. Specifically,
+
+                                                                         we first map the SMILES sequence of the compound to a
+
+graph  =  -  log           exp (sim (zn,i,  zn,j ) / )              (2)  vector. The SMILES sequence is segmented into characters
+                         =1,n= n exp (sim   (zn,i, zn
+                  N                                     ,j  )  / )       or character groups, and they are encoded into one-hot
+
+                      n                                                  vectors, which are combined to obtain the initial vector
+
+                         sim(zn,i, zn,j )   =     zn,izn,j          (3)  representation s0  Rm×d of each sequence, where m
+                                               zn,izn,j                  and d represent the sequence length (after padding) and
+
+where N represents the number of molecules in the current                the number of character categories, respectively. Subse-
+batch, and n represents the other N -1 samples except n.
+                                                                         quently, we input the embedding vector s0 of the sequence
+In our comparison task, the graph G of the N -th sample                  into BiGRU.
+and the augmented graph Gaug are taken as positive sample
+pairs, and zn,i and zn,j are their representation vectors                Compared with LSTM [49], GRUs [50] simplifies the
+respectively. The graph G of the n-th sample and the
+other N -1 augmented graphs Gaug are taken as negative                   gate structure and has higher training efficiency. Although
+sample pairs, and zn,i is the representation vector of the
+other N -1 augmented graphs Gaug. The cosine similarity                  Transformer-based sequence models have demonstrated
+function sim(zn,i, zn,j) is used to calculate the similarity
+of the sample pairs.                                                     strong capability in modeling long-range dependencies
+
+   In addition, in order to enhance the ability of the pre-              in SMILES strings, we intentionally adopt a BiGRU-
+
+trained model to reconstruct atomic attributes, we set                   based encoder in this work. This design choice is mainly
+
+an atomic prediction task. Specifically, for an augmented                motivated by computational efficiency and scalability in
+
+graph Gaug of a molecule, we predict the initial features                large-scale pre-training, as well as the role of the sequence
+of the atomic nodes with masked attributes and calculate
+                                                                         modality in our framework. Specifically, in the proposed
+the cross-entropy loss:
+                                                                         graph­sequence contrastive learning setting, the SMILES
+
+                                                                         sequence is treated as an auxiliary modality to provide
+
+                                                                         complementary semantic information rather than a pri-
+
+                                                                         mary structural representation. Under this consideration,
+
+                                                                         a lightweight yet context-aware sequence encoder is suffi-
+
+                     1   N K                                             cient.
+                  -
+       Latom  =              i=1 k=1  yi,k log(y^i,k)               (4)  BiGRU consists of a forward GRU and a backward
+                    N
+                                                                         GRU, which can obtain context-sensitive representations
+
+where yi,k and y^i,k represent the initial value and predicted           by aggregating information from both directions. By mod-
+value of the feature of the i-th atom, respectively. K
+                                                                         eling the SMILES sequence bidirectionally, BiGRU is able
+
+represents the number of atom types, and N represents                    to capture local and medium-range contextual dependen-
+
+the number of atoms.                                                     cies while maintaining high training efficiency. The hidden
+
+We use graph isomorphism network(GIN) as the back-                       state ht of the characters in the sequence is defined as
+
+bone structure of the graph encoder for feature encoding                 follows:                [- -]
+                                                                                           ht = ht; ht
+of graph data [48]. For a molecule, its graph structure
+
+is represented as G = (V, E), the features of the atomic-                                   -      =  GRU(xt,      --                                                                        (6)
+                                                                                           ht                      ht-1)
+level nodes are defined by the atomic attributes, and the
+                                                                                           -                       --
+fragment-level and graph-level nodes are set to default val-                               ht      =  GRU(xt,      ht-1)
+
+Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:13 UTC from IEEE Xplore. Restrictions apply.
+                   © 2026 IEEE. All rights reserved, including rights for text and data mining and training of artificial intelligence and similar technologies. Personal use is permitted,
+
+                                            but republication/redistribution requires IEEE permission. See https://www.ieee.org/publications/rights/index.html for more information.
+                    This article has been accepted for publication in IEEE Transactions on Computational Biology and Bioinformatics. This is the author's version which has not been fully edited and
+                                                       content may change prior to final publication. Citation information: DOI 10.1109/TCBBIO.2026.3663206
+
+                                                                                                                                                                                                                    6
+
+where   -   and  -      are  the  hidden  states      obtained          by     the  Algorithm 1 Pre-training by MMCL
+        ht       ht
+
+forward and backward GRU, respectively, and the current
+                                                      -                 h-t .
+hidden  state  ht   is  calculated  by  combining     ht           and              1: Input: Molecular graphs Ga = (Va, Ea) and SMILES
+                                                                                       S. graph encoder g and sequence encoder s
+In the sequence encoder, we incorporate the attention
+                                                                                    2: Initialize: learningRate is 0.001, batchSize is 256, to-
+mechanism [51], which has been shown to be effective
+
+in identifying molecular substructures. These substruc-                                  talEpoch is 100, augmentation type is AttributeMask,
+
+tures are usually related to molecular properties and help                               augRatio is 0.2, the number of gnn layers is 5.
+
+the model learn features related to molecular properties.                           3: Reconstructing the molecular graph Ga through the
+                                                                                       improved BRICS algorithm: Ga  G = (V, E), where
+Specifically, for a SMILES sequence, we calculate the
+
+attention score and summarize the representations of all                               V = [Va, Vm, Vg] , E = [Ea, Em, Eg]
+                                                                                    4: for epoch= 1 to totalEpoch do
+atoms in a weighted manner to obtain the representation
+
+of this sequence zs:                                                                5: for i= 1 to N do
+
+                    ij     = Softmax [MLP(h)]                                  (7)  6:       Gaug = AttributeMask(G)
+                           s = FC (m i=1 ij hj )                               (8)
+                                                                                    7:       z = g(G), zaug, yatom = g(Gaug)
+
+                                                                                    8:       s0 = One-hot Encoder(S)
+
+where h is the representation of the atom in the sequence,                          9:       s = s(s0)
+and the attention score  is normalized by the soft-
+max function. The sequence representation is obtained by                            10:      graph = - log nNe= xnpe(xspim(s(izmn,(iz, nz,ni,,jz)n/,j)) / )
+weighted aggregation of the representations of all atoms.
+                                                                                    11:      Lgasto=m-=lo-gN1Nne=Nix=np1e (xspikKm(=s(1izmyni,(,ikz, nlson,ig,,j(s)y^n/i,,kj))) / )
+   We construct a multi-modal contrastive task, which is                            12:
+similar to the graph-graph contrastive task. We take the
+graph and sequence of the n-th sample as the positive                               13:      L = gD graph +  gD gs + Latom
+sample pair, and the graph of the n-th sample and the
+sequence of other N -1 samples as the negative sample pair,                         14: end for
+and calculate the loss as follows:
+                                                                                    15: end for
+
+gs      =   -  log  N        exp (sim (zn,i,  sn,j )  / )       )  / )         (9)
+                           =1,n= n exp (sim   (zn,i   , sn
+                        n                                   ,j
+
+where zn,i and sn,j are the representation vectors of the                           Algorithm 2 Fine-tuning by MMCL
+graph G and sequence S of the n-th sample respectively,
+                                                                                    1: Input: Molecular graphs Ga with their property labels
+and sn,j is the representation vector of the other N -                                 in baseline datasets D; model f .
+1 sample sequences. Finally, the overall loss function is
+                                                                                    2: Load pre-trained weights to initialize f
+defined as follows:                                                                 3: for epoch= 1 to totalEpoch do
+
+        L = Latom +  Lgraph + Lgraph_seq                                            4: y^ = f (Ga)
+          = Latom + gD graph +  gD gs
+                                                                            (10)    5:   if  D is the   =daNt1asetNi=fo1r[ycil·alosgsi(fy^ici)a+tio(1n-taysi)k·ltohge(1n-y^i)]
+                                                                                    6:       Lf intune
+
+where  is a weight coefficient used to weigh the contribu-                          7: else if D is the dataset for regression task then
+tion of graph-graph contrastive learning loss and graph-
+                                                                                    8:       if  D   iinntu[nQeM=7,N1QM8iN=,Q1M|y^i9]-tyhie| n
+                                                                                    9:           Lf
+sequence contrastive learning loss.
+                                                                                             else if D is the     daNit=a1s(eyt^if-or  regression  task                              then
+                                                                                    10:                                                yi)2
+                               TABLE I                                              11:          Lf intune  =  1
+Statistics for the classification task datasets                                                                N
+(BACE, BBBP, Tox21, Toxcast, SIDER, Clintox)                                                 end if
+                                                                                    12:
+                   evaluated by ROC-AUC.
+                                                                                    13: end if
+
+                                                                                    14: end for
+
+Datasets            Molecules           Tasks                   Metrics
+
+BACE                     1,522            1                 ROC-AUC                                                TABLE II
+ BBBP                    2,053                                                      Statistics for the regression task datasets
+ Tox21                   8,014            1                 ROC-AUC
+Toxcast                  8,615                                                              (ESOL, FreeSolv, Lipophilicity, QM7).
+SIDER                    1,427            12                ROC-AUC
+Clintox                  1,491
+                                          617               ROC-AUC
+ZINC15                  249,456
+                                          27                ROC-AUC                   Datasets          Molecules  Tasks                           Metrics
+
+                                          2                 ROC-AUC                     ESOL               1,128      1                            RMSE
+                                                                                      FreeSolv              643       1                            RMSE
+                                          -                        -                Lipophilicity          4,200      1                            RMSE
+                                                                                                           7,165      1                             MAE
+   We describe the pre-training and fine-tuning processes                                QM7
+in Algorithm 1 and Algorithm 2, respectively. In the
+
+       Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:13 UTC from IEEE Xplore. Restrictions apply.
+                          © 2026 IEEE. All rights reserved, including rights for text and data mining and training of artificial intelligence and similar technologies. Personal use is permitted,
+
+                                                   but republication/redistribution requires IEEE permission. See https://www.ieee.org/publications/rights/index.html for more information.
+This article has been accepted for publication in IEEE Transactions on Computational Biology and Bioinformatics. This is the author's version which has not been fully edited and
+                                   content may change prior to final publication. Citation information: DOI 10.1109/TCBBIO.2026.3663206
+
+                                                                                                                                                                                                7
+
+Fig. 3: Results of BBBP split by molecular scaffold. The      pre-training stage, the model constructs a hierarchical
+ratio of training set, validation set and test set is 8:1:1.  molecular graph G (line 3 of Algorithm 1 ) and performs
+Each set shows the scaffolds of some molecules.               attribute mask augmentation on the molecular graph to
+                                                              obtain the augmented graph Gaug. Afterwards, the vector
+                                                              representations z and zaug of the graph G and Gaug are
+                                                              obtained through the graph encoder g (lines 6 to 7 of
+                                                              Algorithm 1). The model encodes the sequence S with one-
+                                                              hot coding and obtains vector representation s through the
+                                                              sequence encoder s (lines 8 to 9 of Algorithm 1 ). The
+                                                              loss of the self-supervised tasks is calculated according to
+                                                              the description in Section III-B and Section III-C (lines 10
+                                                              to 13 of Algorithm 1).
+
+                                                                 In the fine-tuning phase, the model is initialized using
+                                                              the weights obtained from the pre-training (line 2 of
+                                                              Algorithm 2), and then the input molecules are mapped to
+                                                              the vector space (line 4 of Algorithm 2), which are applied
+                                                              to different molecular property prediction tasks (lines 5 to
+                                                              13 of Algorithm 2 ).
+
+                             TABLE III                                      IV. Experiments and Analysis
+Table of parameters in the pre-training phase.
+                                                                 In this section, we first present the data and settings of
+           Parameters              Value                      the experiments, and then verify the performance of our
+                                                              proposed pre-training framework by comparing it with the
+              Epoch                 100                       baseline methods, carrying out ablation experiments, and
+           Batch Size               256                       related studies.
+         Num Workers
+            Optimizer                 8                       A. Datasets
+         Learning Rate            Adam
+Graph Augmentation Type         1 × 10-3                         We use the ZINC15 dataset [52] for pre-training, which
+Graph Augmentation Ratio  Attribute Masking                   contains about 2.49 × 105 unlabeled small molecule com-
+        Graph Encoder                                         pounds. We use the SMILES sequence and molecular
+        Layers of GINs              0.2                       graph of each small molecule as input. To ensure consistent
+      Sequence Encoder              GIN                       molecular representations, all SMILES strings from both
+   Embedding Dimension                                        pre-training and downstream datasets are standardized
+        Loss Weight()                 5                       before being used as model inputs. The standardization
+                                 BiGRU                        includes structure cleaning and unified expression of stere-
+                                                              ochemistry, charges, and aromaticity, preventing multiple
+                                    256                       forms of the same molecule from affecting learning. For
+                                    0.1                       fine-tuning, we use six datasets selected from Moleculenet
+                                                              [53] for classification tasks, namely BACE, BBBP, Tox21,
+                              TABLE IV                        Toxcast, SIDER, and Clintox. We use four datasets for
+Table of training parameters for the baseline                 regression tasks, namely ESOL, FreeSolv, Lipophilicity,
+                                                              and QM7. The molecules in these datasets have property
+                                models.                       labels. Table I and II give the statistics of these datasets.
+
+       Parameters           Value                                We split the benchmark dataset based on the skeleton
+                                                              of the compound with a ratio of 8:1:1, ensuring that the
+           Epoch             100                              training, validation, and test sets have molecules with
+        Batch Size           256                              different skeletons. Figure 3 shows the split results of
+      NumWorkers                                              BBBP and its molecular skeleton. Intuitively, the training
+        Optimizer              8                              set is unbalanced, which poses a greater challenge to
+     Learning Rate          Adam                              the generalization ability of the model compared to the
+     Graph Encoder        1 × 10-3                            random partitioning method.
+     Layers of GINs          GIN
+Embedding Dimension                                              To ensure consistent molecular representations, all
+                               5                              SMILES strings from both pre-training and downstream
+                             300                              datasets are standardized before being used as model in-
+                                                              puts. The standardization includes structure cleaning and
+                                                              unified expression of stereochemistry, charges, and aro-
+                                                              maticity, which reduces inconsistencies caused by different
+                                                              SMILES representations of the same molecular graph.
+
+Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:13 UTC from IEEE Xplore. Restrictions apply.
+                   © 2026 IEEE. All rights reserved, including rights for text and data mining and training of artificial intelligence and similar technologies. Personal use is permitted,
+
+                                            but republication/redistribution requires IEEE permission. See https://www.ieee.org/publications/rights/index.html for more information.
+This article has been accepted for publication in IEEE Transactions on Computational Biology and Bioinformatics. This is the author's version which has not been fully edited and
+                                   content may change prior to final publication. Citation information: DOI 10.1109/TCBBIO.2026.3663206
+
+                                                                                                                                                                                                8
+
+                                                                       TABLE V
+Results for classification tasks of molecular property prediction. The mean (and standard variance)
+of the ROC-AUC (%) for 10 random seeds on the six datasets is reported. The best and second best
+results are shown by bolding and adding underlines, respectively. Higher values indicate better
+
+                                                                   performance.
+
+Models / Datasets    BACE        BBBP        Tox21           Toxcast      SIDER      Clintox    Average
+
+   ContextPred     78.8 (1.6)  70.1 (0.9)  74.5 (0.9)       63.0 (0.4)  59.9 (1.1)  73.2 (3.8)    69.9
+       Infomax     73.8 (1.3)  67.2 (1.3)  74.4 (0.9)       63.1 (0.5)  58.5 (0.9)  73.0 (4.2)    68.3
+      EdgePred     80.1 (2.2)  70.2 (1.5)  73.6 (0.6)       63.0 (0.6)  58.6 (1.3)  75.5 (2.4)    70.2
+                   75.5 (1.9)  67.9 (1.3)  73.8 (0.7)       64.0 (0.3)  58.6 (0.9)  85.1 (2.4)    70.8
+    AttrMasking    73.5 (1.8)  70.1 (0.9)  73.7 (0.7)       63.3 (0.7)  59.6 (0.5)  79.2 (1.9)    69.9
+      GraphCL      73.0 (1.1)  68.9 (1.1)  73.8 (0.7)       63.1 (0.4)  60.3 (1.0)  83.5 (1.9)    70.5
+        JOAO       72.2 (1.4)  68.8 (1.1)  74.2 (0.5)       63.4 (0.5)  59.7 (0.6)  83.7 (2.0)    70.3
+      JOAOv2       68.6 (1.3)  65.9 (1.1)  69.7 (0.5)       60.9 (0.3)  57.3 (0.5)  57.7 (1.4)    63.3
+        MoCL       80.2 (1.2)  68.3 (1.1)  74.3 (0.6)       62.7 (0.1)  59.7 (0.6)  80.3 (3.3)    70.9
+                   77.8 (0.7)  66.5 (1.0)  73.9 (0.7)       63.1 (0.4)  58.9 (0.5)  58.7 (1.2)    66.5
+    GraphMAE       78.5(1.3)   70.8 (0.8)  71.6(0.8)        62.7(1.9)   59.7(0.4)   86.9 (2.3)    71.7
+    SimGEACE       81.2 (0.9)  66.9 (2.1)  77.1 (0.3)       65.8 (0.6)  60.7 (0.4)  68.6 (2.7)    70.1
+
+      MolCLR       82.6 (1.0)  70.3 (0.7)  75.9 (0.6)       66.7 (0.5)  60.4 (0.5)  75.2 (1.8)    71.9
+        HiMol
+
+  MMCL (Ours)
+
+B. Experiment Settings                                      compared to the best-performing baseline, and achieved
+                                                            the highest overall average performance across all datasets.
+   We use the Adam optimizer [54] in both pre-training      The experimental results demonstrate the effectiveness of
+and fine-tuning. The parameters of the pre-training phase   our framework in learning relevant chemical knowledge
+are as follows. The model training iterations are 100, the  within molecules. In addition, although we have achieved
+batch size is 32, the learning rate is set to 0.001, and    the best results in average performance, the results on the
+the weight in the loss function is 0.1. The graph encoder   Clintox show that our model still has room for further
+uses a 5-layer GIN (hidden layer dimension is 256) as the   improvement.
+backbone structure, and the attribute mask rate is 0.2.
+The sequence encoder uses BiGRU for encoding. Table III        We further analyze the results of the classification task
+lists the relevant parameter settings of the model.         through box plots. The observations in Fig. 4 are sum-
+                                                            marized as follows. (1) The median of the MMCL box
+C. Molecular Property Prediction                            is higher than that of other baselines in three datasets,
+                                                            indicating that its overall performance is better. (2) The
+   Baseline Models We compared MMCL with the most           box range (i.e., the distance from the lower quartile to
+advanced methods for molecular property prediction, in-     the upper quartile) and whisker length (i.e., the distance
+cluding prediction-based methods: ContextPred, InfoMax      between the minimum value and the lower quartile, and
+, EdgePred, AttributeMask, and ContextPred [32]; gener-     the maximum value and the upper quartile) of MMCL are
+ative reconstruction-based methods: GraphMAE [16] and       relatively small, indicating that the prediction results are
+HiMol [55]; and contrast task-based methods: GraphCL        more consistent and the model has better stability. (3) On
+[19], MoCL [23], JOAO [20], JOAOv2 [20] SimGRACE [24]       the datasets BACE, and Toxcast, more than half of the
+and MolCLR [56]. Since MoCL requires high computing         ten results of MMCL are completely higher than the best
+power to calculate the similarity matrix on the ZINC15      result of the second-best baseline model. Specifically, in
+dataset, we use the approach given by the official code     bace, six of MMCL's results are higher than the top result
+of MoCL for pre-training. Other models were pre-trained     of GraphMAE. In Tox21, seven of MMCL's results are
+on the ZINC15, and experimental parameter settings are      higher than the top result of ContextPred. In particular,
+listed in Table IV.                                         all ten results of MMCL on Toxcast are better than the
+                                                            top result of AttrMasking.
+   Classification Tasks We evaluated the effectiveness of
+MMCL for molecular property prediction by performing           Regression Tasks Table VI reports the mean and stan-
+classification tasks across six datasets. Table V reports   dard deviation of the RMSE/MAE results in regression
+the mean and standard deviation of the ROC-AUC (%)          tasks. Based on MoleculeNet [53], we evaluate it using
+results in the classification tasks. We summarize the re-   root mean square error (RMSE) on ESOL, FreeSolv, and
+sults analysis as follows. We achieved strong performance   Lipophilicity datasets, and mean absolute error (MAE) on
+on five of the six datasets. In particular, we obtained     the QM7 dataset. The results show that we achieved the
+an improvement of 1.4% on BACE and 0.9% on Toxcast          best or second-best results on three of the datasets. In
+
+Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:13 UTC from IEEE Xplore. Restrictions apply.
+                   © 2026 IEEE. All rights reserved, including rights for text and data mining and training of artificial intelligence and similar technologies. Personal use is permitted,
+
+                                            but republication/redistribution requires IEEE permission. See https://www.ieee.org/publications/rights/index.html for more information.
+This article has been accepted for publication in IEEE Transactions on Computational Biology and Bioinformatics. This is the author's version which has not been fully edited and
+                                   content may change prior to final publication. Citation information: DOI 10.1109/TCBBIO.2026.3663206
+
+                                                                                                                                                                                                9
+
+(a) BACE                                                      (b) Tox21
+
+(c) Toxcast                                                   (d) SIDER
+
+Fig. 4: Box plots of the results in the classification task. Boxes of the same color correspond to the same model. The
+horizontal axis is the model name and the vertical axis is the ROC-AUC result.Fig.4 (a), (b), (c), and (d) are the
+results on the datasets BACE, Tox21, Toxcast, and SIDER, respectively.
+
+particular, on the FreeSlov dataset, the results are reduced  D. Ablation Experiment
+by 9.32% compared to the second-best baseline.
+                                                                 We performed ablation studies to evaluate the contribu-
+   It is worth noting that MMCL exhibits relatively weaker    tion of each component of MMCL. Specifically, for "w/o
+performance on the QM7 dataset among the regression           graph-seq cl", we only retain the graph-graph contrastive
+tasks. The QM7 dataset focuses on quantum chemical            learning module, and the loss function is L = Latom +
+properties, which are highly sensitive to precise atomic      Lgraph. For "w/o graph-graph cl", we only retain the
+coordinates and three-dimensional molecular conforma-         graph-sequence comparison module, and the loss function
+tions. In contrast, MMCL primarily models molecular           is L = Lgraph_seq. Since attribute masking is only used
+topology through hierarchical graph structures and ex-        for molecular graphs, the attribute prediction loss is not
+plicit functional group representations, without incorpo-     included in the loss function. In addition, we introduce a
+rating explicit three-dimensional geometric information.      hierarchical molecular graph into our framework to realize
+As a result, hierarchical motif-based representations are     the interaction between low-order atoms and high-order
+more suitable for tasks dominated by functional group         molecules during training. Therefore, we also set up a
+interactions and global structural patterns, while they may   w/o hierarchical mol-graph ablation experiment, where
+be less effective for quantum properties that depend on       the hierarchical molecular graph is not constructed during
+fine-grained geometric and electronic details.
+
+Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:13 UTC from IEEE Xplore. Restrictions apply.
+                   © 2026 IEEE. All rights reserved, including rights for text and data mining and training of artificial intelligence and similar technologies. Personal use is permitted,
+
+                                            but republication/redistribution requires IEEE permission. See https://www.ieee.org/publications/rights/index.html for more information.
+This article has been accepted for publication in IEEE Transactions on Computational Biology and Bioinformatics. This is the author's version which has not been fully edited and
+                                   content may change prior to final publication. Citation information: DOI 10.1109/TCBBIO.2026.3663206
+
+                                                                                                                                                                                              10
+
+(a) BACE   (b) BBBP
+
+(c) Tox21  (d) Toxcast
+
+(e) SIDER  (f) Clintox
+
+Fig. 5: The ROC-AUC curves of different fine-tuning strategies on the training set and test set of classification tasks.
+The horizontal axis represents the iteration number, and the vertical axis represents the ROC-AUC values. The curves
+of the two fine-tuning strategies based on pre-trained weights (Full-FT and Frozen-FT) are more stable, proving that the
+pre-training framework can effectively train the parameters of the graph encoder and use the knowledge for downstream
+tasks. In addition, the full fine-tuning mode (Full-FT) achieved the highest ROC-AUC value, indicating that the model
+with general knowledge can capture more detailed features on specific tasks.
+
+Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:13 UTC from IEEE Xplore. Restrictions apply.
+                   © 2026 IEEE. All rights reserved, including rights for text and data mining and training of artificial intelligence and similar technologies. Personal use is permitted,
+
+                                            but republication/redistribution requires IEEE permission. See https://www.ieee.org/publications/rights/index.html for more information.
+This article has been accepted for publication in IEEE Transactions on Computational Biology and Bioinformatics. This is the author's version which has not been fully edited and
+                                   content may change prior to final publication. Citation information: DOI 10.1109/TCBBIO.2026.3663206
+
+                                                                                                                                                                                              11
+
+                                                                      TABLE VI
+Results of the regression task for molecular property prediction. We report the mean (and
+standard deviation) of RMSE/MAE on ESOL, FreeSlov, Lipophilicity, and QM7. The evaluation
+metric for ESOL, FreeSlov, and Lipophilicity is RMSE; the evaluation metric for QM7 is MAE.
+The best and second-best results are bolded and underlined, respectively. Smaller values indicate
+
+                                                             better performance.
+
+Models / Datasets       ESOL         FreeSolv                 Lipophilicity          QM7
+
+   ContextPred     1.428 (0.053)  3.351 (0.153)               0.774 (0.016)   252.939 (23.278)
+       Infomax     1.403 (0.055)  4.221 (0.573)               0.756 (0.015)   223.300 (21.209)
+      EdgePred     1.479 (0.057)  3.883 (0.597)               0.756 (0.018)   210.331 (26.332)
+                   1.257 (0.027)  3.982 (0.474)               0.771 (0.012)   198.953 (18.328)
+    AttrMasking    1.331 (0.025)  4.674 (0.753)               0.760 (0.017)   209.452 (27.890)
+      GraphCL      1.402 (0.056)  5.178 (0.790)               0.759 (0.013)   212.261 (17.950)
+        JOAO       1.321 (0.054)  6.983 (1.444)               0.761 (0.011)   228.178 (27.719)
+      JOAOv2       1.698 (0.035)  3.319 (0.058)               1.026 (0.008)   162.451 (1.865)
+        MoCL       1.321 (0.040)  3.299 (0.321)               0.760 (0.017)   223.480 (25.077)
+                   1.593 (0.054)  3.464 (0.486)               0.854 (0.028)
+    GraphMAE       1.297 (0.033)  3.237 (0.293)               0.740 (0.014)    97.831 (5.423)
+    SimGEACE       0.937 (0.024)  2.747 (0.058)                0.791 (0.012)  74.983 (8.651)
+                                                                               75.571 (1.031)
+      MolCLR       1.163 (0.062)  2.491 (0.132)               0.779 (0.018)
+        HiMol                                                                 168.903 (8.196)
+
+  MMCL (Ours)
+
+pre-training.                                                 generalization.
+   Table VII presents the results of the ablation exper-
+                                                              E. Fine-tuning Strategy
+iments. Removing any component of MMCL leads to
+performance degradation on benchmark datasets, indi-             The effect of different fine-tuning strategies on down-
+cating that different modalities contribute to molecular      stream tasks was explored. In both the full fine-tuning
+representation learning.                                      mode (Full-FT) and the frozen mode (Frozen-FT), the
+                                                              model loads the pre-trained weights. The difference is that
+   Among the considered components, introducing the hi-       the full fine-tuning mode trains all weights in the graph
+erarchical molecular graph consistently improves perfor-      encoder and the property prediction classifier during fine-
+mance across datasets. By explicitly incorporating motif-     tuning, while the frozen mode only trains the weights in
+level nodes derived from BRICS decomposition, the hierar-     the classifier. We also adopted the from-scratch training
+chical graph enables interactions between atom-level rep-     mode (NoPretrain), in which the graph encoder does
+resentations and higher-order substructures. These motif      not load the pre-trained weights during fine-tuning. The
+nodes correspond to functional groups, which are closely      running results of different fine-tuning strategies are shown
+related to molecular properties. The results suggest that     in Fig. 5. We analyze the results as follows: (1) The
+such explicit modeling of functional groups provides par-     training and test curves of the full fine-tuning mode and
+ticularly informative structural cues and plays a crucial     the frozen mode have better stability, proving that MMCL
+role in learning discriminative molecular representations.    can effectively train graph encoders and apply the learned
+                                                              knowledge in fine-tuning. (2) The full fine-tuning mode
+   In addition, the two contrastive learning variants,        converges to the best performance faster than the from-
+namely graph­graph and graph­sequence contrastive             scratch training mode, indicating that the pre-trained
+learning, exhibit comparable effects when used individu-      weights provide rich general knowledge, and the model can
+ally. This observation indicates that the SMILES-based        capture more detailed features by fine-tuning specific tasks
+sequence modality serves as a complementary view rather       based on this knowledge. (3) The training results of the
+than a standalone representation. By encouraging con-         frozen fine-tuning mode show that general features cannot
+sistency between graph and sequence representations,          be fully applied to specific tasks, resulting in the encoder
+the multimodal contrastive objective helps regularize the     being unable to better extract deep information for specific
+learned embeddings and enrich the semantic information        tasks.
+captured by the graph encoder.
+                                                              F. Molecular Representations Visualization
+   These results demonstrate that MMCL benefits from
+both hierarchical structural modeling and multimodal con-        We visualize molecular representations in the test set
+trastive learning. While the explicit modeling of functional  learned by MMCL as shown in Fig. 6. We choose BACE
+groups through hierarchical graphs appears to be the
+most influential factor, the incorporation of sequence in-
+formation further enhances representation robustness and
+
+Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:13 UTC from IEEE Xplore. Restrictions apply.
+                   © 2026 IEEE. All rights reserved, including rights for text and data mining and training of artificial intelligence and similar technologies. Personal use is permitted,
+
+                                            but republication/redistribution requires IEEE permission. See https://www.ieee.org/publications/rights/index.html for more information.
+This article has been accepted for publication in IEEE Transactions on Computational Biology and Bioinformatics. This is the author's version which has not been fully edited and
+                                   content may change prior to final publication. Citation information: DOI 10.1109/TCBBIO.2026.3663206
+
+                                                                                                                                                                                              12
+
+                                                                      TABLE VII
+Results of ablation experiments on classification datasets. The mean (and standard variance) of
+
+                      the ROC-AUC (%) for 10 random seeds on the six datasets is reported.
+
+Models / Datasets     BACE        BBBP        Tox21            Toxcast     SIDER       Clintox    Average
+                    79.6 (1.1)  70.2 (1.7)  75.5 (0.5)        65.5 (0.4)                            70.6
+ w/o graph-seq cl   79.4 (1.2)  68.7 (1.4)  75.7 (0.8)        65.9 (0.6)  59.0 (1.4)  73.8 (2.3)    70.7
+w/o graph-graph cl  77.4 (1.2)  68.4 (1.0)  75.4 (0.5)        65.5 (0.5)  59.9 (0.8)  74.4 (2.4)    70.1
+                                                                          59.2 (1.3)  74.7 (3.6)
+  w/o hierarchical  82.6 (1.0)  70.3 (0.7)  75.9 (0.6)        66.7 (0.5)                            71.9
+      mol-graph                                                           60.4 (0.5)  72.5 (1.8)
+
+   MMCL (Ours)
+
+from the classification task and Lipophilicity from the       information to couple molecular graphs and SMILES se-
+regression task, and use t-SNE [57] to project the molec-     quence information. Specifically, MMCL consists of two
+ular representations into two-dimensional space. Different    modules: (1) A graph-graph contrastive learning mod-
+colors in the figure represent different molecular property   ule, which introduces hierarchical molecular graphs to
+labels. The figure shows that the molecular representa-       explicitly represent functional groups and perturbs node
+tions are grouped according to the labels. Specifically, the  features with attribute masking in the graph augmenta-
+property labels of BACE represent the binding results of      tion strategy. (2) The graph-sequence contrastive learning
+inhibitors of human -secretase 1 (BACE-1) [58]. In Fig. 6     module obtains a SMILES representation with structural
+(a), the two types of molecules tend to be at opposite ends   context through a sequence encoder, and maximizes the
+of the spectrum. Lipophilicity provides the octanol/water     feature consistency with the graph representation. Ex-
+distribution coefficient (logD at pH 7.4) of the compound,    periments on benchmark datasets show that MMCL has
+which affects the permeability and solubility of the com-     optimal performance in most property prediction tasks,
+pound [53]. In Fig. 6 (b), the exp value of molecules         while ablation experiments validate the effectiveness of
+increases gradually from the top left to the bottom right.    modules in MMCL. We also perform visual analysis which
+The results show that our model can learn features related    shows that the graph encoder trained by MMCL can
+to the properties of the molecule, proving the effectiveness  capture chemically relevant semantic information and has
+of MMCL.                                                      a stronger generalization ability. Although MMCL has the
+                                                              best average performance on property prediction tasks,
+                          V. Conclusion                       it still faces some limitations, such as insufficient abil-
+                                                              ity to capture relationships within molecular structures
+   In this study, a multimodal contrastive learning frame-    related to lipophilicity and clinical toxicity. Additionally,
+work MMCL for molecular property prediction is pre-           since SMILES representations can occasionally introduce
+sented, which exploits the complementarity of multimodal
+
+                    (a) BACE                                              (b) Lipophilicity
+
+Fig. 6: Visualization results of molecular representations on the molecular properties test set. Fig.6(a) is the result of
+the classification task BACE. Fig.6(b) is the result of the regression task Lipophilicity, with increasing values of exp
+from top left to bottom right.
+
+Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:13 UTC from IEEE Xplore. Restrictions apply.
+                   © 2026 IEEE. All rights reserved, including rights for text and data mining and training of artificial intelligence and similar technologies. Personal use is permitted,
+
+                                            but republication/redistribution requires IEEE permission. See https://www.ieee.org/publications/rights/index.html for more information.
+This article has been accepted for publication in IEEE Transactions on Computational Biology and Bioinformatics. This is the author's version which has not been fully edited and
+                                   content may change prior to final publication. Citation information: DOI 10.1109/TCBBIO.2026.3663206
+
+                                                                                                                                                                                              13
+
+errors when encoding molecular sequences, future work                    [16] J. Wang, D. Cao, C. Tang, L. Xu, Q. He, B. Yang,
+                                                                               X. Chen, H. Sun, and T. Hou, "DeepAtomicCharge: a new
+will explore more robust alternatives, such as SELFIES,                        graph convolutional network-based architecture for accurate
+                                                                               prediction of atomic charges," Briefings in Bioinformatics,
+to improve molecular representation reliability [59]. In                       vol. 22, no. 3, p. bbaa183, 08 2020. [Online]. Available:
+                                                                               https://doi.org/10.1093/bib/bbaa183
+future research, relevant influencing factors will be further
+                                                                         [17] X.-S. Li, X. Liu, L. Lu, X.-S. Hua, Y. Chi, and K. Xia, "Mul-
+analyzed to optimize the pretraining framework. Overall,                       tiphysical graph neural network (mp-gnn) for covid-19 drug
+                                                                               design," Briefings in bioinformatics, vol. 23, no. 4, p. bbac231,
+MMCL can serve as an efficient deep learning tool for                          2022.
+
+molecular-related tasks, facilitating the drug discovery                 [18] L. Wu, H. Lin, C. Tan, Z. Gao, and S. Z. Li, "Self-
+                                                                               supervised learning on graphs: Contrastive, generative, or
+process.                                                                       predictive," IEEE Trans. on Knowl. and Data Eng., vol. 35,
+                                                                               no. 4, p. 4216­4235, Apr. 2023. [Online]. Available: https:
+                             References                                        //doi.org/10.1109/TKDE.2021.3131584
+
+ [1] X. Tang, Q. Zhao, J. Wang, and G. Duan, "Molfcl: predicting         [19] Y. You, T. Chen, Y. Sui, T. Chen, Z. Wang, and Y. Shen,
+      molecular properties through chemistry-guided contrastive and            "Graph contrastive learning with augmentations," in Advances
+      prompt learning," Bioinformatics, vol. 41, no. 2, p. btaf061,            in Neural Information Processing Systems, H. Larochelle,
+      2025.                                                                    M. Ranzato, R. Hadsell, M. Balcan, and H. Lin, Eds., vol. 33.
+                                                                               Curran Associates, Inc., 2020, pp. 5812­5823.
+ [2] D. H. Freedman et al., "Hunting for new drugs with ai," Nature,
+      vol. 576, no. 7787, pp. S49­S53, 2019.                             [20] Y. You, T. Chen, Y. Shen, and Z. Wang, "Graph contrastive
+                                                                               learning automated," in Proceedings of the 38th International
+ [3] D. Hecht and G. B. Fogel, "Computational intelligence methods             Conference on Machine Learning, ser. Proceedings of Machine
+      for admet prediction," Front Drug Des Discov, vol. 4, no. 27, pp.        Learning Research, M. Meila and T. Zhang, Eds., vol. 139.
+      351­377, 2009.                                                           PMLR, 18­24 Jul 2021, pp. 12 121­12 132.
+
+ [4] A. S. Rich, Y. H. Chan, B. Birnbaum, K. Haider, J. Haimson,         [21] S. Suresh, P. Li, C. Hao, and J. Neville, "Adversarial graph
+      M. Hale, Y. Han, W. Hickman, K. P. Hoeflich, D. Ortwine,                 augmentation to improve graph contrastive learning," in Ad-
+      A. Özen, and D. B. Belanger, "Machine learning adme models               vances in Neural Information Processing Systems, M. Ranzato,
+      in practice: Four guidelines from a successful lead optimization         A. Beygelzimer, Y. Dauphin, P. Liang, and J. W. Vaughan,
+      case study," ACS Medicinal Chemistry Letters, vol. 15, no. 8,            Eds., vol. 34. Curran Associates, Inc., 2021, pp. 15 920­15 933.
+      pp. 1169­1173, 2024.
+                                                                         [22] D. Xu, W. Cheng, D. Luo, H. Chen, and X. Zhang, "In-
+ [5] X. D. J. Nguyen and Y. Liu, "Methodology for hyperparameter               fogcl: Information-aware graph contrastive learning," in Ad-
+      tuning of deep neural networks for efficient and accurate molec-         vances in Neural Information Processing Systems, M. Ranzato,
+      ular property prediction," Computers & Chemical Engineering,             A. Beygelzimer, Y. Dauphin, P. Liang, and J. W. Vaughan,
+      vol. 193, p. 108928, 2025.                                               Eds., vol. 34. Curran Associates, Inc., 2021, pp. 30 414­30 425.
+
+ [6] X. Yang, Y. Wang, Y. Lin, M. Zhang, O. Liu, J. Shuai, and           [23] M. Sun, J. Xing, H. Wang, B. Chen, and J. Zhou, "Mocl: Data-
+      Q. Zhao, "A multi-task self-supervised strategy for predicting           driven molecular fingerprint via knowledge-aware contrastive
+      molecular properties and fgfr1 inhibitors," Advanced Science,            learning from molecular graph," in Proceedings of the 27th ACM
+      vol. 12, no. 13, p. 2412987, 2025.                                       SIGKDD Conference on Knowledge Discovery & Data Mining,
+                                                                               ser. KDD '21. New York, NY, USA: Association for Computing
+ [7] K. V. Chuang, L. M. Gunsalus, and M. J. Keiser, "Learning                 Machinery, 2021, pp. 3585­3594.
+      molecular representations for medicinal chemistry," Journal of
+      Medicinal Chemistry, vol. 63, no. 16, pp. 8705­8722, 2020,         [24] J. Xia, L. Wu, J. Chen, B. Hu, and S. Z. Li, "Simgrace: A
+      pMID: 32366098.                                                          simple framework for graph contrastive learning without data
+                                                                               augmentation," in Proceedings of the ACM Web Conference
+ [8] X. Zhang, C. Chen, X. Wang, H. Jiang, W. Zhao, and X. Cui,                2022, ser. WWW '22. New York, NY, USA: Association for
+      "Metagin: a lightweight framework for molecular property pre-            Computing Machinery, 2022, pp. 1070­1079.
+      diction," Frontiers of Computer Science, vol. 19, no. 5, p.
+      195912, 2025.                                                      [25] Z. Hou, X. Liu, Y. Cen, Y. Dong, H. Yang, C. Wang, and
+                                                                               J. Tang, "Graphmae: Self-supervised masked graph autoen-
+ [9] "Deep learning methods for molecular representation and prop-             coders," in Proceedings of the 28th ACM SIGKDD Conference
+      erty prediction," Drug Discovery Today, vol. 27, no. 12, p.              on Knowledge Discovery and Data Mining, ser. KDD '22. New
+      103373, 2022.                                                            York, NY, USA: Association for Computing Machinery, 2022,
+                                                                               pp. 594­604.
+[10] J.-H. Chen and Y. J. Tseng, "Different molecular enumeration
+      influences in deep learning: an example using aqueous solubil-     [26] D. Koge, N. Ono, M. Huang, M. Altaf-Ul-Amin, and S. Kanaya,
+      ity," Briefings in Bioinformatics, vol. 22, no. 3, p. bbaa092,           "Embedding of molecular structure using molecular hypergraph
+      2021.                                                                    variational autoencoder with metric learning," Molecular infor-
+                                                                               matics, vol. 40, no. 2, p. 2000203, 2021.
+[11] S. Lim and Y. O. Lee, "Predicting chemical properties using self-
+      attention multi-task learning based on smiles representation,"     [27] Y. Rong, Y. Bian, T. Xu, W. Xie, Y. Wei, W. Huang, and
+      in 2020 25th International Conference on Pattern Recognition             J. Huang, "Self-supervised graph transformer on large-scale
+      (ICPR). IEEE, 2021, pp. 3146­3153.                                       molecular data," Advances in neural information processing
+                                                                               systems, vol. 33, pp. 12 559­12 571, 2020.
+[12] C.-K. Wu, X.-C. Zhang, Z.-J. Yang, A.-P. Lu, T.-J. Hou,
+      and D.-S. Cao, "Learning to SMILES: BAN-based strategies           [28] X. Zang, X. Zhao, and B. Tang, "Hierarchical molecular graph
+      to improve latent representation learning from molecules,"               self-supervised learning for property prediction," Communica-
+      Briefings in Bioinformatics, vol. 22, no. 6, p. bbab327, 08 2021.        tions Chemistry, vol. 6, no. 1, p. 34, 2023.
+      [Online]. Available: https://doi.org/10.1093/bib/bbab327
+                                                                         [29] B.-X. Du, Y. Long, X. Li, M. Wu, and J.-Y. Shi, "Cmms-
+[13] Y. Hou, S. Wang, B. Bai, H. C. S. Chan, and S. Yuan,                      gcl: cross-modality metabolic stability prediction with graph
+      "Accurate physical property predictions via deep learning,"              contrastive learning," Bioinformatics, vol. 39, no. 8, p. btad503,
+      Molecules, vol. 27, no. 5, 2022. [Online]. Available: https:             2023.
+      //www.mdpi.com/1420-3049/27/5/1668
+                                                                         [30] T. Wu, Y. Tang, Q. Sun, and L. Xiong, "Molecular joint rep-
+[14] A. L. Nazarova, L. Yang, K. Liu, A. Mishra, R. K. Kalia, K.-i.            resentation learning via multi-modal information of smiles and
+      Nomura, A. Nakano, P. Vashishta, and P. Rajak, "Dielectric               graphs," IEEE/ACM Transactions on Computational Biology
+      polymer property prediction using recurrent neural networks              and Bioinformatics, vol. 20, no. 5, pp. 3044­3055, 2023.
+      with optimizations," Journal of Chemical Information and Mod-
+      eling, vol. 61, no. 5, pp. 2175­2186, 2021, pMID: 33871989.        [31] W. Zhu, Y. Zhang, D. Zhao, J. Xu, and L. Wang, "Hignn:
+                                                                               A hierarchical informative graph neural network for molecu-
+[15] C. Li, J. Feng, S. Liu, and J. Yao, "A novel molecular                    lar property prediction equipped with feature-wise attention,"
+      representation learning for molecular property prediction                Journal of Chemical Information and Modeling, vol. 63, no. 1,
+      with a multiple smiles-based augmentation," Computational                pp. 43­55, 2023, pMID: 36519623.
+      Intelligence and Neuroscience, vol. 2022, no. 1, p. 8464452,
+      2022. [Online]. Available: https://onlinelibrary.wiley.com/doi/
+      abs/10.1155/2022/8464452
+
+Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:13 UTC from IEEE Xplore. Restrictions apply.
+                   © 2026 IEEE. All rights reserved, including rights for text and data mining and training of artificial intelligence and similar technologies. Personal use is permitted,
+
+                                            but republication/redistribution requires IEEE permission. See https://www.ieee.org/publications/rights/index.html for more information.
+This article has been accepted for publication in IEEE Transactions on Computational Biology and Bioinformatics. This is the author's version which has not been fully edited and
+                                   content may change prior to final publication. Citation information: DOI 10.1109/TCBBIO.2026.3663206
+
+                                                                                                                                                                                              14
+
+[32] W. Hu, B. Liu, J. Gomes, M. Zitnik, P. Liang, V. Pande,             [48] K. Xu, W. Hu, J. Leskovec, and S. Jegelka, "How powerful
+      and J. Leskovec, "Strategies for pre-training graph neural net-          are graph neural networks?" in International Conference on
+      works," in International Conference on Learning Representa-              Learning Representations, 2019, pp. 1­17.
+      tions (ICLR), 2020, pp. 1­22.
+                                                                         [49] A. Graves and A. Graves, "Long short-term memory," Super-
+[33] J. Xia, Y. Zhu, Y. Du, and S. Z. Li, "A systematic survey                 vised sequence labelling with recurrent neural networks, pp. 37­
+      of chemical pre-trained models," in Proceedings of the Thirty-           45, 2012.
+      Second International Joint Conference on Artificial Intelligence,
+      IJCAI-23, E. Elkind, Ed. International Joint Conferences           [50] K. Cho, "Learning phrase representations using rnn encoder-
+      on Artificial Intelligence Organization, 8 2023, pp. 6787­6795,          decoder for statistical machine translation," https://arxiv.org/
+      survey Track.                                                            abs/1406.1078, 2014.
+
+[34] D. Xu, W. Cheng, D. Luo, H. Chen, and X. Zhang, "In-                [51] S. Zheng, Y. Li, S. Chen, J. Xu, and Y. Yang, "Predicting
+      fogcl: Information-aware graph contrastive learning," in Ad-             drug­protein interaction using quasi-visual question answering
+      vances in Neural Information Processing Systems, M. Ranzato,             system," Nature Machine Intelligence, vol. 2, no. 2, pp. 134­140,
+      A. Beygelzimer, Y. Dauphin, P. Liang, and J. W. Vaughan,                 2020.
+      Eds., vol. 34. Curran Associates, Inc., 2021, pp. 30 414­30 425.
+                                                                         [52] T. Sterling and J. J. Irwin, "Zinc 15 - ligand discovery for every-
+[35] Y. Wang, J. Wang, Z. Cao, and A. Barati Farimani, "Molec-                 one," Journal of Chemical Information and Modeling, vol. 55,
+      ular contrastive learning of representations via graph neural            no. 11, pp. 2324­2337, 2015.
+      networks," Nature Machine Intelligence, vol. 4, no. 3, pp. 279­
+      287, 2022.                                                         [53] Z. Wu, B. Ramsundar, E. N. Feinberg, J. Gomes, C. Geniesse,
+                                                                               A. S. Pappu, K. Leswing, and V. Pande, "Moleculenet: a bench-
+[36] Q. Tan, N. Liu, X. Huang, R. Chen, S.-H. Choi, and X. Hu,                 mark for molecular machine learning," Chemical Science, vol. 9,
+      "Mgae: Masked autoencoders for self-supervised learning on               no. 2, pp. 513­530, 2018.
+      graphs," https://arxiv.org/abs/2201.02534, 2022.
+                                                                         [54] D. P. Kingma and J. Ba, "Adam: A method for stochastic
+[37] J. Li, R. Wu, W. Sun, L. Chen, S. Tian, L. Zhu, C. Meng,                  optimization," in 3rd International Conference on Learning
+      Z. Zheng, and W. Wang, "What's behind the mask: Understand-              Representations, ICLR 2015, San Diego, CA, USA, May 7-9,
+      ing masked graph modeling for graph autoencoders," in Pro-               2015, Conference Track Proceedings, 2015, pp. 1­15.
+      ceedings of the 29th ACM SIGKDD Conference on Knowledge
+      Discovery and Data Mining, ser. KDD '23. New York, NY,             [55] X. Zang, X. Zhao, and B. Tang, "Hierarchical molecular graph
+      USA: Association for Computing Machinery, 2023, pp. 1268­                self-supervised learning for property prediction," Communica-
+      1279.                                                                    tions Chemistry, vol. 6, no. 1, p. 34, 2023.
+
+[38] J. Wu, X. Chen, B. Shi, S. Li, and K. Xu, "SEGA: Structural         [56] Y. Wang, J. Wang, Z. Cao, and A. Barati Farimani, "Molec-
+      entropy guided anchor view for graph contrastive learning," in           ular contrastive learning of representations via graph neural
+      Proceedings of the 40th International Conference on Machine              networks," Nature Machine Intelligence, vol. 4, no. 3, pp. 279­
+      Learning, 2023, pp. 37 293­37 312.                                       287, 2022.
+
+[39] Z. Wu, Y. Xiong, S. X. Yu, and D. Lin, "Unsupervised fea-           [57] L. van der Maaten and G. Hinton, "Visualizing data using t-
+      ture learning via non-parametric instance discrimination," in            sne," Journal of Machine Learning Research, vol. 9, no. 86, pp.
+      Proceedings of the IEEE Conference on Computer Vision and                2579­2605, 2008. [Online]. Available: http://jmlr.org/papers/
+      Pattern Recognition (CVPR), June 2018, pp. 3733­3742.                    v9/vandermaaten08a.html
+
+[40] A. v. d. Oord, Y. Li, and O. Vinyals, "Representation learn-        [58] G. Subramanian, B. Ramsundar, V. Pande, and R. A. Denny,
+      ing with contrastive predictive coding," https://arxiv.org/abs/          "Computational modeling of -secretase 1 (bace-1) inhibitors
+      1807.03748, 2018.                                                        using ligand based approaches," Journal of Chemical Informa-
+                                                                               tion and Modeling, vol. 56, no. 10, pp. 1936­1949, 2016.
+[41] Y. Tian, D. Krishnan, and P. Isola, "Contrastive multiview
+      coding," in Computer Vision­ECCV 2020: 16th European Con-          [59] M. Krenn, F. Häse, A. Nigam, P. Friederich, and A. Aspuru-
+      ference, Glasgow, UK, August 23­28, 2020, Proceedings, Part              Guzik, "Self-referencing embedded strings (selfies): A 100%
+      XI 16. Springer, 2020, pp. 776­794.                                      robust molecular string representation," Machine Learning: Sci-
+                                                                               ence and Technology, vol. 1, no. 4, p. 045024, 2020.
+[42] K. He, H. Fan, Y. Wu, S. Xie, and R. Girshick, "Momentum
+      contrast for unsupervised visual representation learning," in      Mei Gao received the M.S. degree in Artificial Intelligence
+      Proceedings of the IEEE/CVF Conference on Computer Vision
+      and Pattern Recognition (CVPR), June 2020, pp. 9729­9738.          from Soochow University in 2025. Her research interests
+
+[43] T. Chen, S. Kornblith, M. Norouzi, and G. Hinton, "A simple         include deep learning, bioinformatics and machine learning
+      framework for contrastive learning of visual representations," in
+      Proceedings of the 37th International Conference on Machine        Fei Zhu is an associate professor in in School of Computer
+      Learning, ser. Proceedings of Machine Learning Research, H. D.
+      III and A. Singh, Eds., vol. 119. PMLR, 13­18 Jul 2020, pp.        Science and Technology, Soochow University, Suzhou,
+      1597­1607.
+                                                                         Jiangsu, China. His current research interests mainly in-
+[44] X. Chen, H. Fan, R. Girshick, and K. He, "Improved baselines
+      with momentum contrastive learning," https://arxiv.org/abs/        clude de novo molecular generation, molecular property
+      2003.04297, 2020.
+                                                                         prediction, representation learning, machine learning and
+[45] T. Chen, S. Kornblith, K. Swersky, M. Norouzi, and G. E.
+      Hinton, "Big self-supervised models are strong semi-supervised     artificial intelligence.
+      learners," in Advances in Neural Information Processing Sys-
+      tems, H. Larochelle, M. Ranzato, R. Hadsell, M. Balcan, and
+      H. Lin, Eds., vol. 33. Curran Associates, Inc., 2020, pp. 22 243­
+      22 255.
+
+[46] M. Caron, I. Misra, J. Mairal, P. Goyal, P. Bojanowski, and
+      A. Joulin, "Unsupervised learning of visual features by contrast-
+      ing cluster assignments," in Advances in Neural Information
+      Processing Systems, H. Larochelle, M. Ranzato, R. Hadsell,
+      M. Balcan, and H. Lin, Eds., vol. 33. Curran Associates, Inc.,
+      2020, pp. 9912­9924.
+
+[47] A. Radford, J. W. Kim, C. Hallacy, A. Ramesh, G. Goh,
+      S. Agarwal, G. Sastry, A. Askell, P. Mishkin, J. Clark,
+      G. Krueger, and I. Sutskever, "Learning transferable visual
+      models from natural language supervision," in Proceedings of
+      the 38th International Conference on Machine Learning, 2021,
+      pp. 8748­8763.
+
+Authorized licensed use limited to: Harvard University SEAS. Downloaded on April 01,2026 at 01:11:13 UTC from IEEE Xplore. Restrictions apply.
+                   © 2026 IEEE. All rights reserved, including rights for text and data mining and training of artificial intelligence and similar technologies. Personal use is permitted,
+
+                                            but republication/redistribution requires IEEE permission. See https://www.ieee.org/publications/rights/index.html for more information.
+
