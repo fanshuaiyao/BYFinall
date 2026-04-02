@@ -153,7 +153,11 @@
 
 
 
-% *** MATH PACKAGES ***
+\usepackage{placeins}
+\usepackage{afterpage}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{graphicx}
 %
 %\usepackage{amsmath}
 % A popular package from the American Mathematical Society that provides
@@ -370,11 +374,11 @@
 % was not built to handle multiple paragraphs
 %
 
-\author{Shuaiyao~Fan,
-        Yunyun~Niu,~
+\author{Yunyun~Niu,
+        Shuaiyao~Fan,~
         and~Anonymous~Author
-\thanks{S. Fan is with the School of Computer Science and Technology, China University of Geosciences (Beijing), Beijing, China. (e-mail: fanshuaiyao@cugb.edu.cn).}% <-this % stops a space
 \thanks{Y. Niu is with the School of Computer Science and Technology, China University of Geosciences (Beijing), Beijing, China. (e-mail: niuyunyun@cugb.edu.cn).}% <-this % stops a space
+\thanks{S. Fan is with the School of Computer Science and Technology, China University of Geosciences (Beijing), Beijing, China. (e-mail: fanshuaiyao@cugb.edu.cn).}% <-this % stops a space
 \thanks{Manuscript received April 01, 2026; revised --.}}
 
 % note the % following the last \IEEEmembership and also \thanks - 
@@ -530,9 +534,9 @@ T_{enhanced} = LLM_{rewrite}(T_{raw}, \mathcal{D})
 \end{equation}
 where the LLM is instructed to (1) filter out redundant and noisy information from $T_{raw}$, and (2) explicitly integrate the physicochemical descriptors $\mathcal{D}$ into a coherent, knowledge-dense description $T_{enhanced}$. This process transforms vague textual narratives into structured descriptions anchored by objective molecular properties, providing a more robust foundation for subsequent multimodal learning.
 
-The detailed knowledge-rewriting procedure is presented in Algorithm~\ref{alg:knowledge_rewriting}.
+The detailed knowledge-rewriting procedure is presented in Algorithm~\ref{alg:knowledge_rewriting}. The algorithm accepts a SMILES string and PubChem CID as input, then queries the PubChem PUG View API to obtain raw textual descriptions. It extracts ten physicochemical descriptors using RDKit, constructs specific prompts for the LLM, and generates an enhanced description with integrated molecular properties. An optional validation step ensures descriptor consistency in the output.
 
-\begin{algorithm}
+\begin{algorithm}[H]
 \caption{Knowledge Rewriting Pipeline}
 \label{alg:knowledge_rewriting}
 \begin{algorithmic}[1]
@@ -669,7 +673,8 @@ Table~\ref{tab:classification} presents the classification performance on six Mo
 % Please add the following required packages to your document preamble:
 % \usepackage{booktabs}
 % \usepackage{multirow}
-\begin{table*}[!t]
+\FloatBarrier
+\begin{table*}[htbp]
 \caption{Classification Performance (AUROC) on MoleculeNet Benchmarks}
 \label{tab:classification}
 \centering
@@ -689,10 +694,11 @@ MoleculeSTM & 0.872 & 0.930 & 0.939 & -- & 0.634 & 0.605 & -- \\
 \bottomrule
 \end{tabular}
 \end{table*}
+\FloatBarrier
 
 Table~\ref{tab:regression} shows the regression performance measured by RMSE. KGAMA achieves the best performance on ESOL (0.831) and Lipo (0.655), and competitive results on FreeSolv (1.512). The consistent improvements across both classification and regression tasks demonstrate the robustness of our framework.
 
-\begin{table}[!t]
+\begin{table}[htbp]
 \caption{Regression Performance (RMSE) on MoleculeNet Benchmarks}
 \label{tab:regression}
 \centering
@@ -710,11 +716,13 @@ MoMu & 0.831 & 1.512 & 0.655 \\
 \bottomrule
 \end{tabular}
 \end{table}
+\FloatBarrier
 
 \subsection{Ablation Studies}
 To validate the contribution of each component, we conduct ablation studies on six classification datasets. As shown in Table~\ref{tab:ablation}, removing all multimodal alignment (w/o ALL) significantly degrades performance, with ClinTox dropping from 0.939 to 0.805. Removing text contrastive learning (w/o STC) and fingerprint contrastive learning (w/o TC) also cause notable performance drops, confirming the value of each modality. Removing the uncertainty-based weighting (w/o C) leads to suboptimal results, demonstrating the necessity of adaptive gradient balancing.
 
-\begin{table}[!t]
+\FloatBarrier
+\begin{table}[htbp]
 \caption{Ablation Study on MoleculeNet Classification Tasks (AUROC)}
 \label{tab:ablation}
 \centering
@@ -731,6 +739,7 @@ w/o C & 0.862 & 0.922 & 0.915 & 0.835 & 0.709 & 0.661 \\
 \bottomrule
 \end{tabular}
 \end{table}
+\FloatBarrier
 
 \subsection{Analysis of Learned Uncertainty Weights}
 Fig.~\ref{fig:weights} visualizes the learned homoscedastic uncertainty weights ($\lambda_m$) across different datasets. The graph modality consistently exhibits the lowest uncertainty, confirming its role as a reliable semantic anchor. Text modality shows higher uncertainty on some datasets (e.g., SIDER), likely due to noisy descriptions, and the adaptive weighting effectively down-weights its contribution. This validates that our uncertainty-based mechanism successfully identifies and mitigates the impact of noisy modalities.
