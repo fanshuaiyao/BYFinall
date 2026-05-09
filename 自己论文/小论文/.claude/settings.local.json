@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(printf '%s' '{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"E:/桌面/毕业最终/自己论文/小论文/.claude/hooks/tmp_hook_test.py\"}}')",
+      "Bash(printf '%s *)",
+      "Bash(python \"E:/桌面/毕业最终/自己论文/小论文/.claude/hooks/python_syntax_check.py\")"
+    ]
+  }
+}
